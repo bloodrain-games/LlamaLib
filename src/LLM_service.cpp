@@ -1,14 +1,14 @@
+#define LLAMALIB_NO_SERVER_JSON 1
+
 #include "LLM_service.h"
 
 #include "arg.h"
 #include "common.h"
 #include "llama-chat.h"
 #include "log.h"
+#include "server-context.h"
+#include "server-http.h"
 
-#ifndef SERVER_H
-#define SERVER_H
-#include "server-context.cpp"
-#endif // SERVER_H
 
 //============================= LLMService IMPLEMENTATION =============================//
 
@@ -196,7 +196,7 @@ void LLMService::init(int argc, char **argv)
 
         params = new common_params();
         params->port = 0;
-        params->verbosity = common_log_verbosity_thold;
+        params->verbosity = common_log_get_verbosity_thold();
         if (!common_params_parse(argc, argv, *params, LLAMA_EXAMPLE_SERVER))
         {
             throw std::runtime_error("Invalid parameters!");
@@ -219,8 +219,8 @@ void LLMService::init(int argc, char **argv)
         }
 
         // for consistency between server router mode and single-model mode, we set the same model name as alias
-        if (params->model_alias.empty() && !params->model.name.empty()) {
-            params->model_alias.insert(params->model.name);
+        if (params->model_alias.empty() && !params->model.empty()) {
+            params->model_alias.insert(params->model.get_name());
         }
 
         common_init();
@@ -247,21 +247,12 @@ void LLMService::init(int argc, char **argv)
         // params->chat_template = detect_chat_template();
         // LOG_INF("chat_template: %s\n", params->chat_template.c_str());
 
-        ctx_server->impl->queue_tasks.on_new_task([this](server_task && task)
-                                            { this->ctx_server->impl->process_single_task(std::move(task)); });
-        ctx_server->impl->queue_tasks.on_update_slots([this]()
-                                                { this->ctx_server->impl->update_slots(); });
+        ctx_server->set_enable_thinking(reasoning_enabled);
     }
     catch (...)
     {
-        LLMProviderRegistry::instance().unregister_instance(this);
-        handle_exception(-1);
+        handle_exception();
     }
-}
-
-void LLMService::enable_reasoning(bool reasoning) {
-    LLMProvider::enable_reasoning(reasoning);
-    if (ctx_server != nullptr) ctx_server->impl->chat_params.enable_thinking = reasoning_enabled;
 }
 
 // const std::string LLMService::detect_chat_template()
@@ -287,6 +278,16 @@ void LLMService::enable_reasoning(bool reasoning) {
 //     return "";
 // }
 
+
+void LLMService::enable_reasoning(bool reasoning)
+{
+    LLMProvider::enable_reasoning(reasoning);
+    if (ctx_server != nullptr)
+    {
+        ctx_server->set_enable_thinking(reasoning);
+    }
+}
+
 void LLMService::debug(int debug_level)
 {
     common_log_set_verbosity_thold(debug_level - 2);
@@ -297,35 +298,23 @@ void LLMService::logging_callback(CharArrayFn callback)
     log_callback = callback;
 }
 
-void release_slot(server_slot &slot)
-{
-    if (slot.task && slot.task->type == SERVER_TASK_TYPE_COMPLETION)
-    {
-        slot.i_batch = -1;
-        slot.task->params.n_predict = 0;
-        slot.stop = STOP_TYPE_LIMIT;
-        slot.has_next_token = false;
-    }
-    else
-    {
-        slot.release();
-    }
-}
+
 
 int LLMService::get_next_available_slot()
 {
     if (get_status_code() < 0 || setjmp(get_jump_point()) != 0)
         return -1;
-    if (ctx_server->impl->slots.size() == 0)
+    size_t slots_size = ctx_server->get_slots_size();
+    if (slots_size == 0)
         return -1;
-    return next_available_slot++ % ctx_server->impl->slots.size();
+    return next_available_slot++ % slots_size;
 }
 
 int LLMService::get_slot_context_size()
 {
     if (get_status_code() < 0 || setjmp(get_jump_point()) != 0)
         return -1;
-    return ctx_server->impl->get_slot_n_ctx();
+    return ctx_server->get_meta().slot_n_ctx;
 }
 
 // wrapper function that handles exceptions and logs errors
@@ -352,9 +341,9 @@ static server_http_context::handler_t ex_wrapper(server_http_context::handler_t 
         auto res = std::make_unique<server_http_res>();
         res->status = 500;
         try {
-            json error_data = format_error_response(message, error);
+            auto error_data = format_error_response(message, error);
             res->status = json_value(error_data, "code", 500);
-            res->data = safe_json_to_str({{ "error", error_data }});
+            res->data = "{\"error\":" + error_data.dump() + "}";
             SRV_WRN("got exception: %s\n", res->data.c_str());
         } catch (const std::exception & e) {
             SRV_ERR("got another exception: %s | while handling exception: %s\n", e.what(), message.c_str());
@@ -446,7 +435,7 @@ void LLMService::start()
     service_thread = std::thread([&]()
                                  {
         LLAMALIB_INF("starting service\n");
-        ctx_server->impl->queue_tasks.start_loop();
+        ctx_server->start_loop();
         LLAMALIB_INF("stopped service loop\n");
         return 1; });
     while (!started())
@@ -466,17 +455,13 @@ void LLMService::stop()
             return;
         LLAMALIB_INF("shutting down tasks\n");
 
-        // hack completion slots to think task is completed
-        for (server_slot &slot : ctx_server->impl->slots)
-        {
-            release_slot(slot);
-        }
+        ctx_server->release_all_slots();
 
-        if((!ctx_server->impl->queue_tasks.is_empty()))
+        if (!ctx_server->is_queue_empty())
         {
             LLAMALIB_INF("Wait until tasks have finished\n");
             int grace = 20;
-            while (!ctx_server->impl->queue_tasks.is_empty() && grace-- > 0)
+            while (!ctx_server->is_queue_empty() && grace-- > 0)
             {
                 std::this_thread::sleep_for(std::chrono::milliseconds(50));
             }
@@ -516,7 +501,7 @@ void LLMService::join_service()
 
 bool LLMService::started()
 {
-    return ctx_server != nullptr && ctx_server->impl->queue_tasks.is_running();
+    return ctx_server != nullptr && ctx_server->is_queue_running();
 }
 
 void LLMService::set_SSL(const std::string &SSL_cert_str, const std::string &SSL_key_str)
@@ -532,7 +517,7 @@ std::string LLMService::encapsulate_route(const json &body, server_http_context:
 
     try
     {
-        server_http_req req{ {}, {}, "", "", body.dump(), always_false };
+        server_http_req req{ {}, {}, "", "", body.dump(), {}, always_false };
         return route_handler(req)->data;
     }
     catch (...)
@@ -544,15 +529,7 @@ std::string LLMService::encapsulate_route(const json &body, server_http_context:
 
 std::string LLMService::apply_template_json(const json &body)
 {
-    if (get_status_code() < 0 || setjmp(get_jump_point()) != 0)
-        return "";
-    std::vector<raw_buffer> files; // dummy, unused
-    json copy = body;
-    json data = oaicompat_chat_params_parse(
-        copy,
-        ctx_server->impl->chat_params,
-        files);
-    return safe_json_to_str({{"prompt", std::move(data.at("prompt"))}});
+    return encapsulate_route(body, routes->post_apply_template);
 }
 
 std::string LLMService::tokenize_json(const json &body)
@@ -572,7 +549,7 @@ std::string LLMService::embeddings_json(const json &body)
 
 std::string LLMService::lora_weight_json(const json &body)
 {
-    return safe_json_to_str(encapsulate_route(body, routes->post_lora_adapters));
+    return encapsulate_route(body, routes->post_lora_adapters);
 };
 
 std::string LLMService::lora_list_json()
@@ -591,7 +568,7 @@ std::string LLMService::completion_json(const json &data_in, CharArrayFn callbac
         json data = data_in;
         data["stream"] = stream;
 
-        server_http_req req{ {}, {}, "", "", data.dump(), always_false };
+        server_http_req req{ {}, {}, "", "", data.dump(), {}, always_false };
         auto result = routes->post_completions(req);
         if (result->status != 200)
         {
@@ -626,55 +603,28 @@ std::string LLMService::slot_json(const json &data)
 {
     if (get_status_code() < 0 || setjmp(get_jump_point()) != 0)
         return "";
-    std::string result_data = "";
     try
     {
-        server_task_type task_type;
         std::string action = data.at("action");
+        int task_type;
         if (action == "save")
-        {
             task_type = SERVER_TASK_TYPE_SLOT_SAVE;
-        }
         else if (action == "restore")
-        {
             task_type = SERVER_TASK_TYPE_SLOT_RESTORE;
-        }
         else if (action == "erase")
-        {
             task_type = SERVER_TASK_TYPE_SLOT_ERASE;
-        }
         else
-        {
-            throw std::runtime_error("Invalid action" + action);
-        }
+            throw std::runtime_error("Invalid action: " + action);
 
         int id_slot = json_value(data, "id_slot", 0);
-
-        server_task task(task_type);
-        task.id = ctx_server->impl->queue_tasks.get_new_id();
-        task.slot_action.id_slot = id_slot;
-
-        if (action == "save" || action == "restore")
-        {
-            std::string filepath = data.at("filepath");
-            task.slot_action.filename = filepath.substr(filepath.find_last_of("/\\") + 1);
-            task.slot_action.filepath = filepath;
-        }
-
-        ctx_server->impl->queue_results.add_waiting_task_id(task.id);
-        ctx_server->impl->queue_tasks.post(std::move(task));
-
-        server_task_result_ptr result = ctx_server->impl->queue_results.recv(task.id);
-        ctx_server->impl->queue_results.remove_waiting_task_id(task.id);
-
-        json result_json = result->to_json();
-        result_data = result_json.dump();
+        std::string filepath = (action == "save" || action == "restore") ? data.at("filepath").get<std::string>() : "";
+        return ctx_server->slot_action(task_type, id_slot, filepath);
     }
     catch (...)
     {
         handle_exception();
     }
-    return result_data;
+    return "";
 }
 
 void LLMService::cancel(int id_slot)
@@ -683,14 +633,7 @@ void LLMService::cancel(int id_slot)
         return;
     try
     {
-        for (auto &slot : ctx_server->impl->slots)
-        {
-            if (slot.id == id_slot)
-            {
-                release_slot(slot);
-                break;
-            }
-        }
+        ctx_server->cancel_slot(id_slot);
     }
     catch (...)
     {
@@ -712,7 +655,7 @@ std::unique_ptr<server_http_res> LLMService::get_props(){
     if (get_status_code() < 0 || setjmp(get_jump_point()) != 0)
         return nullptr;
 
-    server_http_req req{ {}, {}, "", "", "", always_false };
+    server_http_req req{ {}, {}, "", "", "", {}, always_false };
     auto result = routes->get_props(req);
 
     json data = json::parse(result->data);
@@ -723,11 +666,12 @@ std::unique_ptr<server_http_res> LLMService::get_props(){
     }
     catch (...){}
 
-    result->data = safe_json_to_str(json {
+    json out = {
         { "default_generation_settings", {
             { "n_ctx", n_ctx }
         }}
-    });
+    };
+    result->data = out.dump();
     return result;
 };
 
@@ -772,7 +716,7 @@ LLMService *LLMService_From_Command(const char *params_string_arr)
         json j = json::parse(params_string);
         llmService = LLMService::from_params(j);
     }
-    catch (const json::parse_error &)
+    catch (const std::exception &)
     {
         llmService = LLMService::from_command(params_string);
     }

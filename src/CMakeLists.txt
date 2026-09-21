@@ -16,17 +16,24 @@ add_library(
     ${LLAMALIB_ARCHITECTURE_LIBRARY}
     ${ARCHITECTURE_LIBRARY_TYPE}
     LLM_service.cpp $<TARGET_OBJECTS:llamalib_common>
+     ${LLAMA_CPP_ROOT}/tools/server/server-context.cpp
      ${LLAMA_CPP_ROOT}/tools/server/server-queue.cpp
      ${LLAMA_CPP_ROOT}/tools/server/server-common.cpp
      ${LLAMA_CPP_ROOT}/tools/server/server-task.cpp
      ${LLAMA_CPP_ROOT}/tools/server/server-http.cpp
+     ${LLAMA_CPP_ROOT}/tools/server/server-chat.cpp
+     ${LLAMA_CPP_ROOT}/tools/server/server-models.cpp
+     ${LLAMA_CPP_ROOT}/tools/server/server-stream.cpp
+     ${LLAMA_CPP_ROOT}/tools/server/server-tools.cpp
+     ${LLAMA_CPP_ROOT}/tools/server/server-mcp.cpp
+     ${LLAMA_CPP_ROOT}/tools/server/server-schema.cpp
 )
 if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_link_options(${LLAMALIB_ARCHITECTURE_LIBRARY} PRIVATE -Wl,--no-undefined)
 endif()
 LLAMALIB_COMPILE_DEFS(${LLAMALIB_ARCHITECTURE_LIBRARY})
 target_include_directories(${LLAMALIB_ARCHITECTURE_LIBRARY} PRIVATE "${LLAMA_CPP_ROOT}/src" "${LLAMA_CPP_ROOT}/ggml/include" "${LLAMA_CPP_ROOT}/tools/server" "${LLAMA_CPP_ROOT}/tools/mtmd" "${LLAMA_CPP_ROOT}/common")
-target_link_libraries(${LLAMALIB_ARCHITECTURE_LIBRARY} PRIVATE common mtmd)
+target_link_libraries(${LLAMALIB_ARCHITECTURE_LIBRARY} PRIVATE llama-common mtmd llama-ui)
 install(TARGETS ${LLAMALIB_ARCHITECTURE_LIBRARY} LIBRARY)
 
 # build runtime library
