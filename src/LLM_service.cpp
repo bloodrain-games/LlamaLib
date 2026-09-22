@@ -696,7 +696,7 @@ int LLMService::embedding_size()
 {
     if (get_status_code() < 0)
         return 0;
-    if (cached_model_n_embd_inp > 0)
+    if (cached_model_n_embd_inp >= 0)
         return cached_model_n_embd_inp;
     if (setjmp(get_jump_point()) != 0)
         return 0;

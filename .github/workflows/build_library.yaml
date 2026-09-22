@@ -111,6 +111,7 @@ jobs:
           with:
             name: ${{ matrix.arch }}.zip
             path: ${{ matrix.arch }}.zip
+            retention-days: 1
 
 
   osx-x64-build:
@@ -231,6 +232,7 @@ jobs:
           with:
             name: ${{ matrix.arch }}.zip
             path: ${{ matrix.arch }}.zip
+            retention-days: 1
 
 
   osx-universal-build:
@@ -274,6 +276,7 @@ jobs:
           with:
             name: ${{ matrix.arch }}.zip
             path: ${{ matrix.arch }}.zip
+            retention-days: 1
 
 
 ################################ Windows ################################
@@ -404,6 +407,7 @@ jobs:
           with:
             name: ${{ matrix.arch }}.zip
             path: ${{ matrix.arch }}.zip
+            retention-days: 1
 
 
 ################################ Android ################################
@@ -485,6 +489,7 @@ jobs:
           with:
             name: ${{ matrix.arch }}.zip
             path: ${{ matrix.arch }}.zip
+            retention-days: 1
 
 
 ################################ iOS ################################
@@ -570,6 +575,7 @@ jobs:
           with:
             name: ${{ matrix.arch }}.zip
             path: ${{ matrix.arch }}.zip
+            retention-days: 1
 
 
 ################################ Release ################################
