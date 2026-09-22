@@ -12,6 +12,8 @@
 
 //============================= LLMService IMPLEMENTATION =============================//
 
+static const std::function<bool()> default_should_stop = []() { return false; };
+
 LLMService::LLMService() {}
 
 LLMService::LLMService(const std::string &model_path, int num_slots, int num_threads, int num_GPU_layers, bool flash_attention, int context_size, int batch_size, bool embedding_only, const std::vector<std::string> &lora_paths)
@@ -314,7 +316,9 @@ int LLMService::get_slot_context_size()
 {
     if (get_status_code() < 0 || setjmp(get_jump_point()) != 0)
         return -1;
-    return ctx_server->get_meta().slot_n_ctx;
+    if (ctx_server != nullptr)
+        return ctx_server->get_meta().slot_n_ctx;
+    return -1;
 }
 
 // wrapper function that handles exceptions and logs errors
@@ -522,8 +526,9 @@ std::string LLMService::encapsulate_route(const json &body, server_http_context:
 
     try
     {
-        server_http_req req{ {}, {}, "", "", body.dump(), {}, always_false };
-        return route_handler(req)->data;
+        server_http_req req{ {}, {}, "", "", body.dump(), {}, default_should_stop };
+        auto res = route_handler(req);
+        return res ? res->data : "";
     }
     catch (...)
     {
@@ -573,8 +578,12 @@ std::string LLMService::completion_json(const json &data_in, CharArrayFn callbac
         json data = data_in;
         data["stream"] = stream;
 
-        server_http_req req{ {}, {}, "", "", data.dump(), {}, always_false };
+        server_http_req req{ {}, {}, "", "", data.dump(), {}, default_should_stop };
         auto result = routes->post_completions(req);
+        if (!result)
+        {
+            return "";
+        }
         if (result->status != 200)
         {
             return result->data;
@@ -651,17 +660,18 @@ int LLMService::embedding_size()
     if (get_status_code() < 0 || setjmp(get_jump_point()) != 0)
         return 0;
 
-    int n_embd = 0;
-    if (ctx_server == nullptr) return 0;
-    return ctx_server->get_meta().model_n_embd_inp;
+    if (ctx_server != nullptr)
+        return ctx_server->get_meta().model_n_embd_inp;
+    return 0;
 }
 
 std::unique_ptr<server_http_res> LLMService::get_props(){
     if (get_status_code() < 0 || setjmp(get_jump_point()) != 0)
         return nullptr;
 
-    server_http_req req{ {}, {}, "", "", "", {}, always_false };
+    server_http_req req{ {}, {}, "", "", "", {}, default_should_stop };
     auto result = routes->get_props(req);
+    if (!result) return nullptr;
 
     json data = json::parse(result->data);
     int n_ctx = -1;

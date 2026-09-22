@@ -57,13 +57,34 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Windows" OR CMAKE_SYSTEM_NAME STREQUAL "Linux" OR
 
     # merge OpenSSL into the static library
     if (NOT WIN32)
-        add_custom_command(TARGET ${LLAMALIB_STATIC_RUNTIME_LIBRARY} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_BINARY_DIR}/temp_extract
-            COMMAND cd ${CMAKE_CURRENT_BINARY_DIR}/temp_extract && ${CMAKE_AR} x $<TARGET_FILE:cpp-httplib>
-            COMMAND cd ${CMAKE_CURRENT_BINARY_DIR}/temp_extract && ${CMAKE_AR} x $<TARGET_FILE:OpenSSL::SSL>
-            COMMAND cd ${CMAKE_CURRENT_BINARY_DIR}/temp_extract && ${CMAKE_AR} x $<TARGET_FILE:OpenSSL::Crypto>
-            COMMAND ${CMAKE_AR} rcs $<TARGET_FILE:${LLAMALIB_STATIC_RUNTIME_LIBRARY}> ${CMAKE_CURRENT_BINARY_DIR}/temp_extract/*.o
-            COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_CURRENT_BINARY_DIR}/temp_extract
-        )
+        if (APPLE)
+            if (CMAKE_OSX_ARCHITECTURES)
+                set(LIBTOOL_ARCH_FLAG -arch_only ${CMAKE_OSX_ARCHITECTURES})
+            elseif (ARCHITECTURE MATCHES "x64")
+                set(LIBTOOL_ARCH_FLAG -arch_only x86_64)
+            elseif (ARCHITECTURE MATCHES "arm64")
+                set(LIBTOOL_ARCH_FLAG -arch_only arm64)
+            endif()
+            add_custom_command(TARGET ${LLAMALIB_STATIC_RUNTIME_LIBRARY} POST_BUILD
+                COMMAND /usr/bin/libtool -static -no_warning_for_no_symbols ${LIBTOOL_ARCH_FLAG}
+                    -o $<TARGET_FILE:${LLAMALIB_STATIC_RUNTIME_LIBRARY}>.merged
+                    $<TARGET_FILE:${LLAMALIB_STATIC_RUNTIME_LIBRARY}>
+                    $<TARGET_FILE:cpp-httplib>
+                    $<TARGET_FILE:OpenSSL::SSL>
+                    $<TARGET_FILE:OpenSSL::Crypto>
+                COMMAND ${CMAKE_COMMAND} -E rename
+                    $<TARGET_FILE:${LLAMALIB_STATIC_RUNTIME_LIBRARY}>.merged
+                    $<TARGET_FILE:${LLAMALIB_STATIC_RUNTIME_LIBRARY}>
+            )
+        else()
+            add_custom_command(TARGET ${LLAMALIB_STATIC_RUNTIME_LIBRARY} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_BINARY_DIR}/temp_extract
+                COMMAND cd ${CMAKE_CURRENT_BINARY_DIR}/temp_extract && ${CMAKE_AR} x $<TARGET_FILE:cpp-httplib>
+                COMMAND cd ${CMAKE_CURRENT_BINARY_DIR}/temp_extract && ${CMAKE_AR} x $<TARGET_FILE:OpenSSL::SSL>
+                COMMAND cd ${CMAKE_CURRENT_BINARY_DIR}/temp_extract && ${CMAKE_AR} x $<TARGET_FILE:OpenSSL::Crypto>
+                COMMAND ${CMAKE_AR} rcs $<TARGET_FILE:${LLAMALIB_STATIC_RUNTIME_LIBRARY}> ${CMAKE_CURRENT_BINARY_DIR}/temp_extract/*.o
+                COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_CURRENT_BINARY_DIR}/temp_extract
+            )
+        endif()
     endif()
 endif()
