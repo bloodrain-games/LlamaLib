@@ -226,6 +226,8 @@ private:
     bool server_stopped = false;                ///< Server stop flag
 
     int next_available_slot = 0;
+    int cached_slot_n_ctx = -1;
+    int cached_model_n_embd_inp = 0;
 
     /// @brief Split command line string into arguments
     /// @param inputString String containing space-separated arguments

@@ -246,6 +246,10 @@ void LLMService::init(int argc, char **argv)
         routes = new server_routes(*params, *ctx_server);
         routes->update_meta(*ctx_server);
 
+        auto meta = ctx_server->get_meta();
+        cached_slot_n_ctx = meta.slot_n_ctx;
+        cached_model_n_embd_inp = meta.model_n_embd_inp;
+
         // params->chat_template = detect_chat_template();
         // LOG_INF("chat_template: %s\n", params->chat_template.c_str());
 
@@ -314,7 +318,11 @@ int LLMService::get_next_available_slot()
 
 int LLMService::get_slot_context_size()
 {
-    if (get_status_code() < 0 || setjmp(get_jump_point()) != 0)
+    if (get_status_code() < 0)
+        return -1;
+    if (cached_slot_n_ctx > 0)
+        return cached_slot_n_ctx;
+    if (setjmp(get_jump_point()) != 0)
         return -1;
     if (ctx_server != nullptr)
         return ctx_server->get_meta().slot_n_ctx;
@@ -657,7 +665,11 @@ void LLMService::cancel(int id_slot)
 
 int LLMService::embedding_size()
 {
-    if (get_status_code() < 0 || setjmp(get_jump_point()) != 0)
+    if (get_status_code() < 0)
+        return 0;
+    if (cached_model_n_embd_inp > 0)
+        return cached_model_n_embd_inp;
+    if (setjmp(get_jump_point()) != 0)
         return 0;
 
     if (ctx_server != nullptr)
