@@ -9,140 +9,7 @@ env:
   CUDA: 12.4.1
 
 jobs:
-  ################################ Linux ################################
-
-  linux-build:
-    runs-on: ubuntu-22.04
-
-    strategy:
-      matrix:
-        include:
-          - arch: linux-x64_noavx
-          - arch: linux-x64_avx2
-          - arch: linux-x64_avx
-          - arch: linux-x64_avx512
-          - arch: linux-x64_vulkan
-          - arch: linux-x64_tinyblas
-          - arch: linux-x64_cublas
-            
-    steps:
-        - id: setup_libs_linux
-          name: Dependencies
-          run: |
-            sudo apt-get update
-            sudo apt-get install -y build-essential cmake zip libssl-dev git libcurl4-openssl-dev curl libgomp1
-
-        - id: checkout
-          name: Clone
-          uses: actions/checkout@v4
-          with:
-            submodules: recursive
-
-        - id: preparation
-          name: Preparation
-          run: |
-            mkdir -p build/libs
-            echo "CMAKE_VARS=-DARCHITECTURE=${{ matrix.arch }} -DCMAKE_RUNTIME_OUTPUT_DIRECTORY=${{ github.workspace }}/build/libs -DCMAKE_ARCHIVE_OUTPUT_DIRECTORY=${{ github.workspace }}/build/libs -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=${{ github.workspace }}/build/libs ${{ matrix.cmake_vars }}" >> $GITHUB_ENV
-          shell: bash
-
-        - id: setup_vulkan_linux
-          if: contains(matrix.arch, 'vulkan')
-          name: Dependencies Vulcan
-          run: |
-            wget -qO - https://packages.lunarg.com/lunarg-signing-key-pub.asc | sudo apt-key add -
-            sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-jammy.list https://packages.lunarg.com/vulkan/lunarg-vulkan-jammy.list
-            sudo apt-get update -y
-            sudo apt-get install -y build-essential vulkan-sdk
-            cp /lib/x86_64-linux-gnu/libvulkan.so.1 build/libs/
-
-        - id: setup_cuda_linux
-          if: contains(matrix.arch, 'blas')
-          uses: Jimver/cuda-toolkit@v0.2.15
-          with:
-            cuda: ${{ env.CUDA }}
-            linux-local-args: '["--toolkit"]'
-            method: network
-
-        - id: link_cuda_linux
-          if: contains(matrix.arch, 'blas')
-          name: Link Cuda
-          run: |
-            ln -s ${{ env.CUDA_PATH }} ${{ github.workspace }}/build/cuda
-            echo "CUDAToolkit_ROOT=$GITHUB_WORKSPACE/build/cuda" >> $GITHUB_ENV
-            echo "LD_LIBRARY_PATH=''" >> $GITHUB_ENV
-
-
-        - id: cpu-cores
-          name: Get number of CPU cores
-          uses: SimenB/github-actions-cpu-cores@v2
-
-        - id: cmake_build
-          name: Build
-          run: |
-            cd build
-            cmake .. ${{ env.CMAKE_VARS }}
-            cmake --build . --config Release -j ${{ steps.cpu-cores.outputs.count }}
-
-        - id: test_build
-          name: Test
-          run: |
-            flag=0
-            if [[ "$RUNNER_OS" == "macOS" ]]; then
-              flag=1
-            else
-                CPU_FLAGS=$(grep -o 'avx[^ ]*' /proc/cpuinfo | sort -u | tr '\n' ' ')
-                ARCH="${{ matrix.arch }}"
-                FEATURE="${ARCH##*_}"
-                if echo "$CPU_FLAGS" | grep -qw "$FEATURE"; then
-                  flag=1
-                fi
-            fi
-        
-            if [[ "$flag" == "1" ]]; then
-              ./tests/download_test_models.sh
-              cd build
-              if [[ "$RUNNER_OS" == "Windows" ]]; then
-                ./libs/Release/llamalib_tests.exe
-                ./libs/Release/llamalib_tests_runtime.exe
-              else
-                ./libs/llamalib_tests
-                ./libs/llamalib_tests_runtime
-              fi
-            fi
-          shell: bash
-
-
-        - id: pack_artifacts
-          name: Pack artifacts
-          run: |
-            ls -R build
-        
-            mkdir -p artifacts
-            mv build/Release/*llamalib* artifacts/ 2>/dev/null || true
-            mv build/libs/*llamalib* artifacts/ 2>/dev/null || true
-            mv build/libs/*.so* artifacts/ 2>/dev/null || true
-            mv build/libs/Release/*llamalib* artifacts/ 2>/dev/null || true
-            mv build/libs/Release/*.dll artifacts/ 2>/dev/null || true
-            rm -f artifacts/*llamalib_tests* artifacts/*exp artifacts/*server*lib 2>/dev/null || true
-        
-            rm -r build
-            cd artifacts
-            if [[ "$RUNNER_OS" == "Windows" ]]; then
-              7z a ../${{ matrix.arch }}.zip *
-            else
-              zip ../${{ matrix.arch }}.zip *
-            fi
-          shell: bash
-
-        - id: upload_llamalib
-          name: Upload Artifacts
-          uses: actions/upload-artifact@v4
-          with:
-            name: ${{ matrix.arch }}.zip
-            path: ${{ matrix.arch }}.zip
-
-
-################################ macOS ################################
+  ################################ macOS ################################
 
   osx-arm64-build:
     runs-on: macos-15
@@ -151,7 +18,6 @@ jobs:
       matrix:
         include:
           - arch: osx-arm64_acc
-          - arch: osx-arm64_no-acc
 
     steps:
         - continue-on-error: true
@@ -253,7 +119,6 @@ jobs:
       matrix:
         include:
           - arch: osx-x64_acc
-          - arch: osx-x64_no-acc
 
     steps:
         - continue-on-error: true
@@ -376,12 +241,10 @@ jobs:
             done
         
             mkdir ${{ matrix.arch }}
-            for acc in no-acc acc;do
-              for f in `ls osx-x64_$acc`;do
-                output=${{ matrix.arch }}/`echo $f|sed -e "s:x64:universal:g"`
-                if [ -f $output ];then continue;fi
-                lipo -create -output $output osx-x64_$acc/$f osx-arm64_$acc/`echo $f|sed -e "s:x64:arm64:g"`
-              done
+            for f in `ls osx-x64_acc`;do
+              output=${{ matrix.arch }}/`echo $f|sed -e "s:x64:universal:g"`
+              if [ -f $output ];then continue;fi
+              lipo -create -output $output osx-x64_acc/$f osx-arm64_acc/`echo $f|sed -e "s:x64:arm64:g"`
             done
             zip -j ../${{ matrix.arch }}.zip ${{ matrix.arch }}/*
 
@@ -405,12 +268,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - arch: win-x64_noavx
           - arch: win-x64_avx2
-          - arch: win-x64_avx
-          - arch: win-x64_avx512
-          - arch: win-x64_vulkan
-          - arch: win-x64_tinyblas
           - arch: win-x64_cublas
 
     steps:
@@ -538,8 +396,6 @@ jobs:
         include:
           - arch: android-arm64
             ABI: arm64-v8a
-          - arch: android-x64
-            ABI: x86_64
 
     steps:
         - id: setup_libs_linux
@@ -621,8 +477,6 @@ jobs:
         include:
           - arch: ios-arm64
             cmake_vars: '-DCMAKE_SYSTEM_NAME=iOS'
-          - arch: visionos-arm64
-            cmake_vars: '-DCMAKE_SYSTEM_NAME=visionOS'
 
     steps:
         - continue-on-error: true
@@ -703,7 +557,6 @@ jobs:
     name: Create Release
     runs-on: ubuntu-22.04
     needs:
-      - linux-build
       - osx-arm64-build
       - osx-x64-build
       - osx-universal-build
@@ -750,35 +603,11 @@ jobs:
             zip -r ${{ env.RELEASE_NAME }}.zip ${{ env.RELEASE_NAME }}
             sha256sum ${{ env.RELEASE_NAME }}.zip | awk '{print $1}' > ${{ env.RELEASE_NAME }}.zip.sha256
 
-        - id: test_cmake
-          name: Test cmake
-          run: |
-            ./tests/download_test_models.sh
-            cd tests/cpp-cmake
-            cmake . -DLLAMALIB_DIR=../../${{ env.RELEASE_NAME }}
-            cmake --build . --config Release
-            ./test
-
         - id: pack_nuget
           name: Pack nuget
           run: |
             cd csharp
             dotnet pack -c Release
-
-        - id: clean_up_release
-          name: Clean up
-          run: |
-            rm -r ${{ env.RELEASE_NAME }}
-
-        - id: test_nuget
-          name: Test nuget
-          run: |
-            ./tests/download_test_models.sh
-            mkdir -p ~/.nuget/packages/LlamaLib
-            ln -s `pwd`/${{ env.RELEASE_NAME }}.zip ~/.nuget/packages/LlamaLib/${{ env.RELEASE_NAME }}.zip
-            cd tests/csharp
-            dotnet build -c Release
-            dotnet test -c Release --logger "console;verbosity=detailed"
 
         - id: release
           name: Release

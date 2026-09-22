@@ -8,11 +8,13 @@ release_dir=$1
 cd $release_dir
 ls -R
 # extract servers
-mkdir servers
-for arch in win-x64_noavx linux-x64_noavx osx-arm64_no-acc osx-x64_no-acc;do
-    unzip -o $arch.zip/$arch.zip -d servers llamalib*server*
+mkdir -p servers
+for arch in win-x64_avx2 osx-universal;do
+    if [ -f "$arch.zip/$arch.zip" ]; then
+        unzip -o $arch.zip/$arch.zip -d servers llamalib*server* 2>/dev/null || true
+    fi
 done
-chmod a+x servers/*
+chmod a+x servers/* 2>/dev/null || true
 
 # extract runtimes
 for d in *.zip;do
