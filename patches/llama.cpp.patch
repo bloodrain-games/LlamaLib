@@ -221,18 +221,10 @@ index 9894f5f06..7b028b45f 100644
  #define SLT_DBG(slot, fmt, ...) LOG_DBG("slot %12.*s: id %2d | task %d | " fmt, 12, __func__, (slot).id, ((slot).task ? (slot).task->id : -1), __VA_ARGS__)
  #define SLT_TRC(slot, fmt, ...) LOG_TRC("slot %12.*s: id %2d | task %d | " fmt, 12, __func__, (slot).id, ((slot).task ? (slot).task->id : -1), __VA_ARGS__)
 diff --git a/tools/server/server-context.cpp b/tools/server/server-context.cpp
-index b6835e434..9e9806101 100644
+index b6835e434..7f9a190f8 100644
 --- a/tools/server/server-context.cpp
 +++ b/tools/server/server-context.cpp
-@@ -26,6 +26,7 @@
- #include <random>
- #include <utility>
- #include <fstream>
-+#include <iostream>
- 
- // fix problem with std::min and std::max
- #if defined(_WIN32)
-@@ -260,8 +261,8 @@ struct server_slot {
+@@ -260,8 +260,8 @@ struct server_slot {
  
      // TODO: move members that belong to the task (such as `generated_text`, `has_new_line`) to task_results_state
      //       see https://github.com/ggml-org/llama.cpp/pull/18283#issuecomment-3710175837
@@ -243,7 +235,7 @@ index b6835e434..9e9806101 100644
  
      // used to determine the slot that has been used the longest
      int64_t t_last_used = -1;
-@@ -872,7 +873,8 @@ public:
+@@ -872,7 +872,8 @@ public:
          metrics.reset_bucket();
      }
  
@@ -253,7 +245,7 @@ index b6835e434..9e9806101 100644
      // note: accessing these fields outside of this class is not thread-safe
      // use server_context methods instead
  
-@@ -1817,7 +1819,7 @@ private:
+@@ -1817,7 +1818,7 @@ private:
          // the per-request limit takes priority over the global one
          slot.n_predict_max = task.params.n_predict != -1 ? task.params.n_predict : params_base.n_predict;
  
@@ -262,7 +254,7 @@ index b6835e434..9e9806101 100644
  
          slot.state = slot.task->is_child()
              ? SLOT_STATE_WAIT_OTHER // wait for the parent to process prompt
-@@ -5556,3 +5558,54 @@ void server_routes::update_cached_responses(bool is_sleeping) {
+@@ -5556,3 +5557,54 @@ void server_routes::update_cached_responses(bool is_sleeping) {
          should_reset_buckets = false;
      }
  }
@@ -318,7 +310,7 @@ index b6835e434..9e9806101 100644
 +    return result ? result->to_json().dump() : "";
 +}
 diff --git a/tools/server/server-context.h b/tools/server/server-context.h
-index 0acbbffa9..2e24e9d03 100644
+index 0acbbffa9..2ef9dcd97 100644
 --- a/tools/server/server-context.h
 +++ b/tools/server/server-context.h
 @@ -23,7 +23,7 @@ struct server_context_meta {
@@ -362,6 +354,17 @@ index 0acbbffa9..2e24e9d03 100644
              const std::vector<raw_buffer> & files,
              task_response_type res_type);
      std::unique_ptr<server_res_generator> handle_slots_save(const server_http_req & req, int id_slot);
+@@ -183,8 +192,8 @@ private:
+ 
+     // cached responses, to be used during sleep
+     std::mutex     mutex_cache;
+-    json           cached_models  = nullptr;
+-    json           cached_props   = nullptr;
++    common_json    cached_models  = nullptr;
++    common_json    cached_props   = nullptr;
+     server_metrics cached_metrics;
+     // set when a scrape during sleep already reported the throughput buckets
+     bool           should_reset_buckets = false;
 diff --git a/tools/server/server-http.cpp b/tools/server/server-http.cpp
 index 2ec137aa0..87db24cd4 100644
 --- a/tools/server/server-http.cpp
