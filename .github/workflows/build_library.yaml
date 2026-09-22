@@ -12,7 +12,7 @@ jobs:
   ################################ macOS ################################
 
   osx-arm64-build:
-    runs-on: macos-15
+    runs-on: [self-hosted, macOS, ARM64]
 
     strategy:
       matrix:
@@ -113,12 +113,13 @@ jobs:
 
 
   osx-x64-build:
-    runs-on: macos-15-intel
+    runs-on: [self-hosted, macOS, ARM64]
 
     strategy:
       matrix:
         include:
           - arch: osx-x64_acc
+            cmake_vars: '-DCMAKE_OSX_ARCHITECTURES=x86_64'
 
     steps:
         - continue-on-error: true
@@ -159,7 +160,16 @@ jobs:
           run: |
             flag=0
             if [[ "$RUNNER_OS" == "macOS" ]]; then
-              flag=1
+              if [[ "$(uname -m)" == "arm64" && "${{ matrix.arch }}" == *"x64"* ]]; then
+                if arch -x86_64 /usr/bin/true 2>/dev/null; then
+                  flag=1
+                else
+                  echo "Rosetta 2 not available, skipping x86_64 tests on ARM64 runner"
+                  flag=0
+                fi
+              else
+                flag=1
+              fi
             else
                 CPU_FLAGS=$(grep -o 'avx[^ ]*' /proc/cpuinfo | sort -u | tr '\n' ' ')
                 ARCH="${{ matrix.arch }}"
@@ -214,7 +224,7 @@ jobs:
 
 
   osx-universal-build:
-    runs-on: macos-15
+    runs-on: [self-hosted, macOS, ARM64]
     needs:
       - osx-arm64-build
       - osx-x64-build
@@ -470,7 +480,7 @@ jobs:
 ################################ iOS ################################
 
   ios-build:
-    runs-on: macos-14
+    runs-on: [self-hosted, macOS, ARM64]
 
     strategy:
       matrix:
