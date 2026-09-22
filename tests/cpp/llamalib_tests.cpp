@@ -12,7 +12,7 @@
 #include <chrono>
 #include <unordered_set>
 
-std::string PROMPT = "<|im_start|>system\nyou are an artificial intelligence assistant<|im_end|>\n<|im_start|>user\nHello, how are you?<|im_end|>\n<|im_start|>assistant\n";
+std::string PROMPT = "<|im_start|>system\nyou are an artificial intelligence assistant<|im_end|>\n<|im_start|>user\nHello, how are you?<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n";
 std::string REPLY = "Hello! I'm here to help you with anything! How can I assist you today?";
 int ID_SLOT = 0;
 int EMBEDDING_SIZE;
@@ -120,7 +120,6 @@ void test_apply_template(LLM *llm, bool use_api)
     json data = json::array();
     data.push_back({{"role", "system"}, {"content", "you are an artificial intelligence assistant"}});
     data.push_back({{"role", "user"}, {"content", "Hello, how are you?"}});
-    data.push_back({{"role", "assistant"}, {"content", ""}});
     std::string data_formatted;
     if (use_api)
         data_formatted = LLM_Apply_Template(llm, data.dump().c_str());

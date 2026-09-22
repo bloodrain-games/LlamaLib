@@ -26,7 +26,8 @@ jobs:
           run: |
             echo "Architecture: $(uname -m)"
             echo "Operating System: $(uname -s)"
-            brew update
+            echo "/opt/homebrew/bin" >> $GITHUB_PATH
+            echo "/usr/local/bin" >> $GITHUB_PATH
 
         - id: checkout
           name: Clone
@@ -128,7 +129,8 @@ jobs:
           run: |
             echo "Architecture: $(uname -m)"
             echo "Operating System: $(uname -s)"
-            brew update
+            echo "/opt/homebrew/bin" >> $GITHUB_PATH
+            echo "/usr/local/bin" >> $GITHUB_PATH
 
         - id: checkout
           name: Clone
@@ -495,7 +497,8 @@ jobs:
           run: |
             echo "Architecture: $(uname -m)"
             echo "Operating System: $(uname -s)"
-            brew update
+            echo "/opt/homebrew/bin" >> $GITHUB_PATH
+            echo "/usr/local/bin" >> $GITHUB_PATH
 
         - id: checkout
           name: Clone

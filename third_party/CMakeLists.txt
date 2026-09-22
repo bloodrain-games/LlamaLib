@@ -89,8 +89,28 @@ endif()
 # apply patches
 function(APPLY_PATCH PATCH ROOT)
     get_filename_component(PATCHNAME ${PATCH} NAME)
-    set(PATCH_MARKER "${ROOT}/${PATCHNAME}")
-    if(NOT EXISTS ${PATCH_MARKER})
+    # Remove any stale marker file left by previous versions
+    if(EXISTS "${ROOT}/${PATCHNAME}")
+        file(REMOVE "${ROOT}/${PATCHNAME}")
+    endif()
+
+    execute_process(
+        COMMAND git apply --reverse --check ${PATCH}
+        WORKING_DIRECTORY ${ROOT}
+        RESULT_VARIABLE is_applied
+        OUTPUT_QUIET
+        ERROR_QUIET
+    )
+
+    if(is_applied EQUAL 0)
+        message(STATUS "Patch ${PATCHNAME} already applied in ${ROOT}")
+    else()
+        execute_process(
+            COMMAND git checkout -- .
+            WORKING_DIRECTORY ${ROOT}
+            OUTPUT_QUIET
+            ERROR_QUIET
+        )
         execute_process(
             COMMAND git apply ${PATCH}
             WORKING_DIRECTORY ${ROOT}
@@ -100,7 +120,6 @@ function(APPLY_PATCH PATCH ROOT)
         if(NOT result EQUAL 0)
             message(FATAL_ERROR "Failed to apply ${PATCH}")
         else()
-            file(WRITE ${PATCH_MARKER} "${PATCH} patch applied")
             message(STATUS "${PATCH} patch applied")
         endif()
     endif()
