@@ -339,10 +339,15 @@ static server_http_context::handler_t ex_wrapper(server_http_context::handler_t 
         }
 
         auto res = std::make_unique<server_http_res>();
-        res->status = 500;
+        int code = (error == ERROR_TYPE_INVALID_REQUEST) ? 400 : 500;
+        std::string err_type = (error == ERROR_TYPE_INVALID_REQUEST) ? "invalid_request_error" : "server_error";
+        res->status = code;
         try {
-            auto error_data = format_error_response(message, error);
-            res->status = json_value(error_data, "code", 500);
+            json error_data = {
+                {"message", message},
+                {"type", err_type},
+                {"code", code}
+            };
             res->data = "{\"error\":" + error_data.dump() + "}";
             SRV_WRN("got exception: %s\n", res->data.c_str());
         } catch (const std::exception & e) {
