@@ -185,11 +185,19 @@ jobs:
               ./tests/download_test_models.sh
               cd build
               if [[ "$RUNNER_OS" == "Windows" ]]; then
+                echo "=== RUNNING llamalib_tests.exe ==="
                 ./libs/Release/llamalib_tests.exe
+                echo "=== FINISHED llamalib_tests.exe ==="
+                echo "=== RUNNING llamalib_tests_runtime.exe ==="
                 ./libs/Release/llamalib_tests_runtime.exe
+                echo "=== FINISHED llamalib_tests_runtime.exe ==="
               else
+                echo "=== RUNNING llamalib_tests ==="
                 ./libs/llamalib_tests
+                echo "=== FINISHED llamalib_tests ==="
+                echo "=== RUNNING llamalib_tests_runtime ==="
                 ./libs/llamalib_tests_runtime
+                echo "=== FINISHED llamalib_tests_runtime ==="
               fi
             fi
           shell: bash
@@ -482,7 +490,7 @@ jobs:
 ################################ iOS ################################
 
   ios-build:
-    runs-on: [self-hosted, macOS, ARM64]
+    runs-on: macos-14
 
     strategy:
       matrix:

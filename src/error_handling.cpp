@@ -76,6 +76,8 @@ void set_current_jump_point(sigjmp_buf* jump_point)
 
 static void handle_terminate()
 {
+    fprintf(stderr, "\n[FATAL] std::terminate() called!\n");
+    fflush(stderr);
     crash_signal_handler(1);
 }
 
@@ -149,6 +151,8 @@ void set_error_handlers(bool crash_handlers, bool sigint_handlers)
 
 void crash_signal_handler(int sig)
 {
+    fprintf(stderr, "\n[FATAL] Crash signal handler caught signal: %d\n", sig);
+    fflush(stderr);
     fail("Severe error occurred", sig);
     sigjmp_buf* jump_point = get_current_jump_point_ptr();
     if (jump_point) siglongjmp(*jump_point, 1);

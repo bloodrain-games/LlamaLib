@@ -1047,6 +1047,7 @@ void test_overflow(LLMService *llm_service, int n_ctx)
     std::string user_prompt = "you didn't greet me";
 
     std::cout << std::endl << "Overflow: Truncate" << std::endl;
+    std::cout.flush();
     fill_history_with_words(agent, num_left, num_messages);
     agent->set_overflow_strategy(ContextOverflowStrategy::Truncate);
     reply = agent->chat(user_prompt);
@@ -1055,6 +1056,7 @@ void test_overflow(LLMService *llm_service, int n_ctx)
     ASSERT(reply != "");
 
     std::cout << std::endl << "Overflow: Summarize" << std::endl;
+    std::cout.flush();
     fill_history_with_words(agent, num_left, num_messages);
     agent->set_overflow_strategy(ContextOverflowStrategy::Summarize, 0.5, "Summarise the provided messages and existing history");
     reply = agent->chat(user_prompt);
@@ -1063,6 +1065,7 @@ void test_overflow(LLMService *llm_service, int n_ctx)
     ASSERT(reply != "");
 
     std::cout << std::endl << "Overflow: None" << std::endl;
+    std::cout.flush();
     fill_history_with_words(agent, num_left, num_messages);
     agent->set_overflow_strategy(ContextOverflowStrategy::None);
     reply = agent->chat(user_prompt);
@@ -1076,6 +1079,7 @@ void test_overflow(LLMService *llm_service, int n_ctx)
 void run_all_tests(LLMService *llm_service, bool embedding)
 {
     std::cout << std::endl << "-------- LLM service --------" << std::endl;
+    std::cout.flush();
     LLM_Start(llm_service);
 
     EMBEDDING_SIZE = LLM_Embedding_Size(llm_service);
@@ -1083,11 +1087,13 @@ void run_all_tests(LLMService *llm_service, bool embedding)
     else run_LLMProvider_tests(llm_service);
 
     std::cout << std::endl << "-------- LLM client --------" << std::endl;
+    std::cout.flush();
     LLMClient llm_client(llm_service);
     if (embedding) run_LLM_embedding_tests(&llm_client);
     else run_LLMLocal_tests(&llm_client);
 
     std::cout << std::endl << "-------- LLM remote client --------" << std::endl;
+    std::cout.flush();
     LLMClient llm_remote_client("http://localhost", 8080);
     llm_service->start_server("", 8080);
     std::this_thread::sleep_for(std::chrono::seconds(1));
@@ -1107,12 +1113,14 @@ void run_all_tests(LLMService *llm_service, bool embedding)
     // llm_service->stop_server();
 
     std::cout << std::endl << "-------- Stop service --------" << std::endl;
+    std::cout.flush();
     LLM_Delete(llm_service);
 }
 
 void run_overflow_tests(LLMService *llm_service, int n_ctx)
 {
     std::cout << std::endl << "-------- Test overflow --------" << std::endl;
+    std::cout.flush();
     llm_service->start();
     test_overflow(llm_service, n_ctx);
     llm_service->stop();

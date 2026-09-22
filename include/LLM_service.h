@@ -8,6 +8,7 @@
 
 #include <thread>
 #include <condition_variable>
+#include <atomic>
 
 #include "LLM.h"
 #include "completion_processor.h"
@@ -221,6 +222,7 @@ private:
     std::thread service_thread;                 ///< Service worker thread
     std::condition_variable service_stopped_cv; ///< Service stop condition variable
     bool service_stopped = false;               ///< Service stop flag
+    std::atomic<bool> service_failed{false};    ///< Service start failure flag
     std::thread server_thread;                  ///< HTTP server thread
     std::condition_variable server_stopped_cv;  ///< Server stop condition variable
     bool server_stopped = false;                ///< Server stop flag

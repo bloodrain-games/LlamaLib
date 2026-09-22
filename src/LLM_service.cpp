@@ -325,7 +325,13 @@ int LLMService::get_slot_context_size()
     if (setjmp(get_jump_point()) != 0)
         return -1;
     if (ctx_server != nullptr)
-        return ctx_server->get_meta().slot_n_ctx;
+    {
+        try {
+            return ctx_server->get_meta().slot_n_ctx;
+        } catch (...) {
+            return -1;
+        }
+    }
     return -1;
 }
 
@@ -449,15 +455,32 @@ void LLMService::start()
     if (get_status_code() < 0 || setjmp(get_jump_point()) != 0)
         return;
     std::lock_guard<std::mutex> lock(start_stop_mutex);
-    service_thread = std::thread([&]()
+    service_failed = false;
+    service_thread = std::thread([this]()
                                  {
-        LLAMALIB_INF("starting service\n");
-        ctx_server->start_loop();
-        LLAMALIB_INF("stopped service loop\n");
-        return 1; });
-    while (!started())
+        try {
+            LLAMALIB_INF("starting service\n");
+            ctx_server->start_loop();
+            LLAMALIB_INF("stopped service loop\n");
+        } catch (const std::exception &e) {
+            fprintf(stderr, "\n[FATAL] Exception in service_thread: %s\n", e.what());
+            fflush(stderr);
+            service_failed = true;
+            fail(e.what(), 1);
+        } catch (...) {
+            fprintf(stderr, "\n[FATAL] Unknown exception in service_thread\n");
+            fflush(stderr);
+            service_failed = true;
+            fail("Unknown exception in service_thread", 1);
+        }
+    });
+    while (!started() && !service_failed)
     {
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    if (service_failed && service_thread.joinable())
+    {
+        service_thread.join();
     }
 }
 
@@ -469,7 +492,13 @@ void LLMService::stop()
     {
         std::lock_guard<std::mutex> lock(start_stop_mutex);
         if (!started())
+        {
+            if (service_thread.joinable())
+            {
+                service_thread.join();
+            }
             return;
+        }
         LLAMALIB_INF("shutting down tasks\n");
 
         ctx_server->release_all_slots();
@@ -673,7 +702,13 @@ int LLMService::embedding_size()
         return 0;
 
     if (ctx_server != nullptr)
-        return ctx_server->get_meta().model_n_embd_inp;
+    {
+        try {
+            return ctx_server->get_meta().model_n_embd_inp;
+        } catch (...) {
+            return 0;
+        }
+    }
     return 0;
 }
 
