@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "skills": {
+    "cpp-coding-standards": {
+      "source": "affaan-m/ecc",
+      "sourceType": "github",
+      "skillPath": "skills/cpp-coding-standards/SKILL.md",
+      "computedHash": "e8c59d13fe23b088e24dcf6b77845823c5b5636b5c52434550f9b1837bc44ac3"
+    },
+    "csharp-async": {
+      "source": "github/awesome-copilot",
+      "sourceType": "github",
+      "skillPath": "skills/csharp-async/SKILL.md",
+      "computedHash": "e889958419757528e43fb674607d13fffe331a6673cfcef2b0ab8ff9fb569bb8"
+    }
+  }
+}

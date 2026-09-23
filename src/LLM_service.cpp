@@ -9,16 +9,18 @@
 #include "server-context.h"
 #include "server-http.h"
 
-
 //============================= LLMService IMPLEMENTATION =============================//
 
 static const std::function<bool()> default_should_stop = []() { return false; };
 
 LLMService::LLMService() {}
 
-LLMService::LLMService(const std::string &model_path, int num_slots, int num_threads, int num_GPU_layers, bool flash_attention, int context_size, int batch_size, bool embedding_only, const std::vector<std::string> &lora_paths)
+LLMService::LLMService(const std::string &model_path, int num_slots, int num_threads, int num_GPU_layers,
+                       bool flash_attention, int context_size, int batch_size, bool embedding_only,
+                       const std::vector<std::string> &lora_paths)
 {
-    init(LLM::LLM_args_to_command(model_path, num_slots, num_threads, num_GPU_layers, flash_attention, context_size, batch_size, embedding_only, lora_paths));
+    init(LLM::LLM_args_to_command(model_path, num_slots, num_threads, num_GPU_layers, flash_attention, context_size,
+                                  batch_size, embedding_only, lora_paths));
 }
 
 LLMService *LLMService::from_params(const json &params_json)
@@ -54,6 +56,11 @@ LLMService::~LLMService()
         }
         delete ctx_server;
         ctx_server = nullptr;
+    }
+    if (params != nullptr)
+    {
+        delete params;
+        params = nullptr;
     }
 }
 
@@ -163,15 +170,17 @@ void LLMService::init(const std::string &params_string)
 {
     std::vector<std::string> arguments = splitArguments("llm " + params_string);
 
-    // Convert vector of strings to argc and argv
+    // Convert vector of strings to argc and argv safely without memory leaks
     int argc = static_cast<int>(arguments.size());
-    char **argv = new char *[argc];
+    std::vector<char *> argv(argc);
+    std::vector<std::vector<char>> argv_buffers(argc);
     for (int i = 0; i < argc; ++i)
     {
-        argv[i] = new char[arguments[i].size() + 1];
-        std::strcpy(argv[i], arguments[i].c_str());
+        argv_buffers[i].assign(arguments[i].begin(), arguments[i].end());
+        argv_buffers[i].push_back('\0');
+        argv[i] = argv_buffers[i].data();
     }
-    init(argc, argv);
+    init(argc, argv.data());
 }
 
 void LLMService::init(const char *params_string)
@@ -207,13 +216,16 @@ void LLMService::init(int argc, char **argv)
         // validate batch size for embeddings
         // embeddings require all tokens to be processed in a single ubatch
         // see https://github.com/ggml-org/llama.cpp/issues/12836
-        if (params->embedding && params->n_batch > params->n_ubatch) {
-            LOG_WRN("%s: embeddings enabled with n_batch (%d) > n_ubatch (%d)\n", __func__, params->n_batch, params->n_ubatch);
+        if (params->embedding && params->n_batch > params->n_ubatch)
+        {
+            LOG_WRN("%s: embeddings enabled with n_batch (%d) > n_ubatch (%d)\n", __func__, params->n_batch,
+                    params->n_ubatch);
             LOG_WRN("%s: setting n_batch = n_ubatch = %d to avoid assertion failure\n", __func__, params->n_ubatch);
             params->n_batch = params->n_ubatch;
         }
 
-        if (params->n_parallel < 0) {
+        if (params->n_parallel < 0)
+        {
             LOG_INF("%s: n_parallel is set to auto, using n_parallel = 4 and kv_unified = true\n", __func__);
 
             params->n_parallel = 4;
@@ -221,7 +233,8 @@ void LLMService::init(int argc, char **argv)
         }
 
         // for consistency between server router mode and single-model mode, we set the same model name as alias
-        if (params->model_alias.empty() && !params->model.empty()) {
+        if (params->model_alias.empty() && !params->model.empty())
+        {
             params->model_alias.insert(params->model.get_name());
         }
 
@@ -231,7 +244,9 @@ void LLMService::init(int argc, char **argv)
         llama_backend_has_init = true;
         llama_numa_init(params->numa);
 
-        LLAMALIB_INF("system info: n_threads = %d, n_threads_batch = %d, total_threads = %d\n", params->cpuparams.n_threads, params->cpuparams_batch.n_threads, std::thread::hardware_concurrency());
+        LLAMALIB_INF("system info: n_threads = %d, n_threads_batch = %d, total_threads = %d\n",
+                     params->cpuparams.n_threads, params->cpuparams_batch.n_threads,
+                     std::thread::hardware_concurrency());
 
         // load the model
         params->use_jinja = true;
@@ -284,7 +299,6 @@ void LLMService::init(int argc, char **argv)
 //     return "";
 // }
 
-
 void LLMService::enable_reasoning(bool reasoning)
 {
     LLMProvider::enable_reasoning(reasoning);
@@ -303,8 +317,6 @@ void LLMService::logging_callback(CharArrayFn callback)
 {
     log_callback = callback;
 }
-
-
 
 int LLMService::get_next_available_slot()
 {
@@ -326,9 +338,12 @@ int LLMService::get_slot_context_size()
         return -1;
     if (ctx_server != nullptr)
     {
-        try {
+        try
+        {
             return ctx_server->get_meta().slot_n_ctx;
-        } catch (...) {
+        }
+        catch (...)
+        {
             return -1;
         }
     }
@@ -337,21 +352,30 @@ int LLMService::get_slot_context_size()
 
 // wrapper function that handles exceptions and logs errors
 // this is to make sure handler_t never throws exceptions; instead, it returns an error response
-static server_http_context::handler_t ex_wrapper(server_http_context::handler_t func) {
-    return [func = std::move(func)](const server_http_req & req) -> server_http_res_ptr {
+static server_http_context::handler_t ex_wrapper(server_http_context::handler_t func)
+{
+    return [func = std::move(func)](const server_http_req &req) -> server_http_res_ptr
+    {
         std::string message;
         error_type error;
-        try {
+        try
+        {
             return func(req);
-        } catch (const std::invalid_argument & e) {
+        }
+        catch (const std::invalid_argument &e)
+        {
             // treat invalid_argument as invalid request (400)
             error = ERROR_TYPE_INVALID_REQUEST;
             message = e.what();
-        } catch (const std::exception & e) {
+        }
+        catch (const std::exception &e)
+        {
             // treat other exceptions as server error (500)
             error = ERROR_TYPE_SERVER;
             message = e.what();
-        } catch (...) {
+        }
+        catch (...)
+        {
             error = ERROR_TYPE_SERVER;
             message = "unknown error";
         }
@@ -360,15 +384,14 @@ static server_http_context::handler_t ex_wrapper(server_http_context::handler_t 
         int code = (error == ERROR_TYPE_INVALID_REQUEST) ? 400 : 500;
         std::string err_type = (error == ERROR_TYPE_INVALID_REQUEST) ? "invalid_request_error" : "server_error";
         res->status = code;
-        try {
-            json error_data = {
-                {"message", message},
-                {"type", err_type},
-                {"code", code}
-            };
+        try
+        {
+            json error_data = {{"message", message}, {"type", err_type}, {"code", code}};
             res->data = "{\"error\":" + error_data.dump() + "}";
             SRV_WRN("got exception: %s\n", res->data.c_str());
-        } catch (const std::exception & e) {
+        }
+        catch (const std::exception &e)
+        {
             SRV_ERR("got another exception: %s | while handling exception: %s\n", e.what(), message.c_str());
             res->data = "Internal Server Error";
         }
@@ -392,14 +415,15 @@ void LLMService::start_server(const std::string &host, int port, const std::stri
 
         std::lock_guard<std::mutex> lock(start_stop_mutex);
 
-        if (!ctx_http->init(*params)) {
+        if (!ctx_http->init(*params))
+        {
             throw std::runtime_error("Failed to initialize HTTP server!");
         }
 
         // register API routes
-        ctx_http->post("/health",  ex_wrapper(routes->get_health)); // public endpoint (no API key check)
+        ctx_http->post("/health", ex_wrapper(routes->get_health));    // public endpoint (no API key check)
         ctx_http->post("/v1/health", ex_wrapper(routes->get_health)); // public endpoint (no API key check)
-        ctx_http->post("/props",  ex_wrapper([this](const server_http_req &) {return get_props();}));
+        ctx_http->post("/props", ex_wrapper([this](const server_http_req &) { return get_props(); }));
         ctx_http->post("/completion", ex_wrapper(routes->post_completions)); // legacy
         ctx_http->post("/completions", ex_wrapper(routes->post_completions));
         ctx_http->post("/chat/completions", ex_wrapper(routes->post_chat_completions));
@@ -410,9 +434,9 @@ void LLMService::start_server(const std::string &host, int port, const std::stri
         ctx_http->post("/embedding", ex_wrapper(routes->post_embeddings)); // legacy
         ctx_http->post("/embeddings", ex_wrapper(routes->post_embeddings));
 
-
         // start the HTTP server before loading the model to be able to serve /health requests
-        if (!ctx_http->start()) {
+        if (!ctx_http->start())
+        {
             stop();
             throw std::runtime_error("Exiting due to HTTP server error\n");
         }
@@ -425,7 +449,6 @@ void LLMService::start_server(const std::string &host, int port, const std::stri
     }
 }
 
-
 void LLMService::stop_server()
 {
     if (get_status_code() < 0 || setjmp(get_jump_point()) != 0)
@@ -435,7 +458,8 @@ void LLMService::stop_server()
     std::lock_guard<std::mutex> lock(start_stop_mutex);
     LLAMALIB_INF("stopping server\n");
     ctx_http->stop();
-    if (ctx_http->thread.joinable()) ctx_http->thread.join();
+    if (ctx_http->thread.joinable())
+        ctx_http->thread.join();
     server_stopped = true;
     server_stopped_cv.notify_all();
     LLAMALIB_INF("stopped server\n");
@@ -446,8 +470,7 @@ void LLMService::join_server()
     if (get_status_code() < 0 || setjmp(get_jump_point()) != 0)
         return;
     std::unique_lock<std::mutex> lock(start_stop_mutex);
-    server_stopped_cv.wait(lock, [this]
-                           { return server_stopped; });
+    server_stopped_cv.wait(lock, [this] { return server_stopped; });
 }
 
 void LLMService::start()
@@ -456,24 +479,30 @@ void LLMService::start()
         return;
     std::lock_guard<std::mutex> lock(start_stop_mutex);
     service_failed = false;
-    service_thread = std::thread([this]()
-                                 {
-        try {
-            LLAMALIB_INF("starting service\n");
-            ctx_server->start_loop();
-            LLAMALIB_INF("stopped service loop\n");
-        } catch (const std::exception &e) {
-            fprintf(stderr, "\n[FATAL] Exception in service_thread: %s\n", e.what());
-            fflush(stderr);
-            service_failed = true;
-            fail(e.what(), 1);
-        } catch (...) {
-            fprintf(stderr, "\n[FATAL] Unknown exception in service_thread\n");
-            fflush(stderr);
-            service_failed = true;
-            fail("Unknown exception in service_thread", 1);
-        }
-    });
+    service_thread = std::thread(
+        [this]()
+        {
+            try
+            {
+                LLAMALIB_INF("starting service\n");
+                ctx_server->start_loop();
+                LLAMALIB_INF("stopped service loop\n");
+            }
+            catch (const std::exception &e)
+            {
+                fprintf(stderr, "\n[FATAL] Exception in service_thread: %s\n", e.what());
+                fflush(stderr);
+                service_failed = true;
+                fail(e.what(), 1);
+            }
+            catch (...)
+            {
+                fprintf(stderr, "\n[FATAL] Unknown exception in service_thread\n");
+                fflush(stderr);
+                service_failed = true;
+                fail("Unknown exception in service_thread", 1);
+            }
+        });
     while (!started() && !service_failed)
     {
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
@@ -541,8 +570,7 @@ void LLMService::join_service()
     if (get_status_code() < 0 || setjmp(get_jump_point()) != 0)
         return;
     std::unique_lock<std::mutex> lock(start_stop_mutex);
-    service_stopped_cv.wait(lock, [this]
-                            { return service_stopped; });
+    service_stopped_cv.wait(lock, [this] { return service_stopped; });
 }
 
 bool LLMService::started()
@@ -563,7 +591,7 @@ std::string LLMService::encapsulate_route(const json &body, server_http_context:
 
     try
     {
-        server_http_req req{ {}, {}, "", "", body.dump(), {}, default_should_stop };
+        server_http_req req{{}, {}, "", "", body.dump(), {}, default_should_stop};
         auto res = route_handler(req);
         return res ? res->data : "";
     }
@@ -608,14 +636,14 @@ std::string LLMService::completion_json(const json &data_in, CharArrayFn callbac
 {
     if (get_status_code() < 0 || setjmp(get_jump_point()) != 0)
         return "";
-    
+
     try
     {
         bool stream = json_value(data_in, "stream", callback != nullptr);
         json data = data_in;
         data["stream"] = stream;
 
-        server_http_req req{ {}, {}, "", "", data.dump(), {}, default_should_stop };
+        server_http_req req{{}, {}, "", "", data.dump(), {}, default_should_stop};
         auto result = routes->post_completions(req);
         if (!result)
         {
@@ -629,17 +657,24 @@ std::string LLMService::completion_json(const json &data_in, CharArrayFn callbac
         if (stream)
         {
             ResponseConcatenator concatenator;
-            if (callback) concatenator.set_callback(callback, callbackWithJSON);
-            while (!concatenator.is_complete()) {
+            if (callback)
+                concatenator.set_callback(callback, callbackWithJSON);
+            while (!concatenator.is_complete())
+            {
                 std::string chunk;
                 bool has_next = result->next(chunk);
-                if (!chunk.empty()) {
-                    if (!concatenator.process_chunk(chunk)) break;
+                if (!chunk.empty())
+                {
+                    if (!concatenator.process_chunk(chunk))
+                        break;
                 }
-                if (!has_next) break;
+                if (!has_next)
+                    break;
             }
             return concatenator.get_result_json();
-        } else {
+        }
+        else
+        {
             return result->data;
         }
     }
@@ -684,7 +719,14 @@ void LLMService::cancel(int id_slot)
         return;
     try
     {
-        ctx_server->cancel_slot(id_slot);
+        if (id_slot < 0)
+        {
+            ctx_server->release_all_slots();
+        }
+        else
+        {
+            ctx_server->cancel_slot(id_slot);
+        }
     }
     catch (...)
     {
@@ -703,22 +745,27 @@ int LLMService::embedding_size()
 
     if (ctx_server != nullptr)
     {
-        try {
+        try
+        {
             return ctx_server->get_meta().model_n_embd_inp;
-        } catch (...) {
+        }
+        catch (...)
+        {
             return 0;
         }
     }
     return 0;
 }
 
-std::unique_ptr<server_http_res> LLMService::get_props(){
+std::unique_ptr<server_http_res> LLMService::get_props()
+{
     if (get_status_code() < 0 || setjmp(get_jump_point()) != 0)
         return nullptr;
 
-    server_http_req req{ {}, {}, "", "", "", {}, default_should_stop };
+    server_http_req req{{}, {}, "", "", "", {}, default_should_stop};
     auto result = routes->get_props(req);
-    if (!result) return nullptr;
+    if (!result)
+        return nullptr;
 
     json data = json::parse(result->data);
     int n_ctx = -1;
@@ -726,17 +773,14 @@ std::unique_ptr<server_http_res> LLMService::get_props(){
     {
         n_ctx = data.at("default_generation_settings").at("n_ctx").get<int>();
     }
-    catch (...){}
+    catch (...)
+    {
+    }
 
-    json out = {
-        { "default_generation_settings", {
-            { "n_ctx", n_ctx }
-        }}
-    };
+    json out = {{"default_generation_settings", {{"n_ctx", n_ctx}}}};
     result->data = out.dump();
     return result;
 };
-
 
 //=========================== API ===========================//
 
@@ -750,7 +794,9 @@ bool LLMService_Supports_GPU()
     return llama_supports_gpu_offload();
 }
 
-LLMService *LLMService_Construct(const char *model_path, int num_slots, int num_threads, int num_GPU_layers, bool flash_attention, int context_size, int batch_size, bool embedding_only, int lora_count, const char **lora_paths)
+LLMService *LLMService_Construct(const char *model_path, int num_slots, int num_threads, int num_GPU_layers,
+                                 bool flash_attention, int context_size, int batch_size, bool embedding_only,
+                                 int lora_count, const char **lora_paths)
 {
     std::vector<std::string> lora_paths_vector;
     if (lora_paths != nullptr && lora_count > 0)
@@ -760,10 +806,12 @@ LLMService *LLMService_Construct(const char *model_path, int num_slots, int num_
             lora_paths_vector.push_back(std::string(lora_paths[i]));
         }
     }
-    LLMService* llmService = new LLMService(model_path, num_slots, num_threads, num_GPU_layers, flash_attention, context_size, batch_size, embedding_only, lora_paths_vector);
+    LLMService *llmService = new LLMService(model_path, num_slots, num_threads, num_GPU_layers, flash_attention,
+                                            context_size, batch_size, embedding_only, lora_paths_vector);
     if (get_status_code() != 0)
     {
-        if (llmService != nullptr) delete llmService;
+        if (llmService != nullptr)
+            delete llmService;
         return nullptr;
     }
     return llmService;
@@ -771,7 +819,7 @@ LLMService *LLMService_Construct(const char *model_path, int num_slots, int num_
 
 LLMService *LLMService_From_Command(const char *params_string_arr)
 {
-    LLMService* llmService;
+    LLMService *llmService;
     std::string params_string(params_string_arr);
     try
     {
@@ -785,7 +833,8 @@ LLMService *LLMService_From_Command(const char *params_string_arr)
 
     if (get_status_code() != 0)
     {
-        if (llmService != nullptr) delete llmService;
+        if (llmService != nullptr)
+            delete llmService;
         return nullptr;
     }
     return llmService;

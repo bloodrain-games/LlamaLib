@@ -6,9 +6,9 @@
 
 #pragma once
 
-#include <thread>
-#include <condition_variable>
 #include <atomic>
+#include <condition_variable>
+#include <thread>
 
 #include "LLM.h"
 #include "completion_processor.h"
@@ -16,22 +16,22 @@
 /// @brief Info-level logging macro for LLama library
 #define LLAMALIB_INF(...) LOG_TMPL(GGML_LOG_LEVEL_INFO, -1, __VA_ARGS__)
 
-struct common_params;  ///< Forward declaration of llama.cpp parameters structure
-struct server_context; ///< Forward declaration of server context structure
+struct common_params;       ///< Forward declaration of llama.cpp parameters structure
+struct server_context;      ///< Forward declaration of server context structure
 struct server_http_context; ///< Forward declaration of server http context structure
 struct server_routes;
 struct server_http_req;
 struct server_http_res;
 
 using server_http_res_ptr = std::unique_ptr<server_http_res>;
-using handler_t = std::function<server_http_res_ptr(const server_http_req & req)>;
+using handler_t = std::function<server_http_res_ptr(const server_http_req &req)>;
 
 /// @brief Concrete implementation of LLMProvider with server capabilities
 /// @details This class provides a full-featured LLM service with HTTP server,
 /// parameter configuration, and backend integration with llama.cpp
 class UNDREAMAI_API LLMService : public LLMProvider
 {
-public:
+  public:
     /// @brief Default constructor
     /// @details Creates an uninitialized LLMService that must be configured before use
     LLMService();
@@ -46,7 +46,9 @@ public:
     /// @param batch_size Processing batch size
     /// @param embedding_only Whether to run in embedding-only mode
     /// @param lora_paths Vector of paths to LoRA adapter files
-    LLMService(const std::string &model_path, int num_slots = 1, int num_threads = -1, int num_GPU_layers = 0, bool flash_attention = false, int context_size = 4096, int batch_size = 2048, bool embedding_only = false, const std::vector<std::string> &lora_paths = {});
+    LLMService(const std::string &model_path, int num_slots = 1, int num_threads = -1, int num_GPU_layers = 0,
+               bool flash_attention = false, int context_size = 4096, int batch_size = 2048,
+               bool embedding_only = false, const std::vector<std::string> &lora_paths = {});
 
     /// @brief Destructor
     ~LLMService();
@@ -131,7 +133,8 @@ public:
     /// @param callback Optional streaming callback function
     /// @param callbackWithJSON Whether callback receives JSON format
     /// @return Generated completion text or JSON
-    std::string completion_json(const json &data, CharArrayFn callback = nullptr, bool callbackWithJSON = true) override;
+    std::string completion_json(const json &data, CharArrayFn callback = nullptr,
+                                bool callbackWithJSON = true) override;
 
     /// @brief Manage slots with HTTP response support
     /// @param data JSON object with slot operation
@@ -210,13 +213,13 @@ public:
     std::string debug_implementation() override { return "standalone"; }
     //=================================== LLM METHODS END ===================================//
 
-private:
+  private:
     std::string command = "";             ///< constructor command
-    common_params *params;                ///< Backend parameters structure
-    bool llama_backend_has_init;          ///< Whether backend is initialized
+    common_params *params = nullptr;      ///< Backend parameters structure
+    bool llama_backend_has_init = false;  ///< Whether backend is initialized
     server_context *ctx_server = nullptr; ///< Server context pointer
-    server_http_context* ctx_http = nullptr;
-    server_routes* routes = nullptr;
+    server_http_context *ctx_http = nullptr;
+    server_routes *routes = nullptr;
 
     std::mutex start_stop_mutex;                ///< Mutex for start/stop operations
     std::thread service_thread;                 ///< Service worker thread
@@ -270,7 +273,11 @@ extern "C"
     /// @param lora_count Number of LoRA paths provided
     /// @param lora_paths Array of LoRA file paths
     /// @return Pointer to new LLMService instance
-    UNDREAMAI_API LLMService *LLMService_Construct(const char *model_path, int num_slots = 1, int num_threads = -1, int num_GPU_layers = 0, bool flash_attention = false, int context_size = 4096, int batch_size = 2048, bool embedding_only = false, int lora_count = 0, const char **lora_paths = nullptr);
+    UNDREAMAI_API LLMService *LLMService_Construct(const char *model_path, int num_slots = 1, int num_threads = -1,
+                                                   int num_GPU_layers = 0, bool flash_attention = false,
+                                                   int context_size = 4096, int batch_size = 2048,
+                                                   bool embedding_only = false, int lora_count = 0,
+                                                   const char **lora_paths = nullptr);
 
     /// @brief Create LLMService from command string (C API)
     /// @param params_string Command line parameter string
@@ -285,7 +292,6 @@ extern "C"
     UNDREAMAI_API void LLMService_InjectErrorState(ErrorState *error_state);
 
     UNDREAMAI_API bool LLMService_Supports_GPU();
-
 }
 
 /// @}

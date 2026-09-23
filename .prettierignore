@@ -1,0 +1,8 @@
+third_party/
+build/
+bin/
+obj/
+*.meta
+*.gguf
+*.nupkg
+*.snupkg

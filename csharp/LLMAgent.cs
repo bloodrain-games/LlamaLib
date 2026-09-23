@@ -1,6 +1,6 @@
 using System;
-using System.IO;
 using System.Collections.Generic;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
@@ -21,11 +21,7 @@ namespace UndreamAI.LlamaLib
 
         public JObject ToJson()
         {
-            return new JObject
-            {
-                ["role"] = role,
-                ["content"] = content
-            };
+            return new JObject { ["role"] = role, ["content"] = content };
         }
 
         public static ChatMessage FromJson(JObject json)
@@ -65,10 +61,12 @@ namespace UndreamAI.LlamaLib
     {
         /// <summary>No automatic handling — may crash if context is exceeded.</summary>
         None = 0,
+
         /// <summary>Remove oldest message pairs from the front until history fits within targetRatio of the context.</summary>
         Truncate = 1,
+
         /// <summary>Summarise history, embed summary in the system message, then truncate if still needed.</summary>
-        Summarize = 2
+        Summarize = 2,
     }
 
     // LLMAgent class
@@ -87,7 +85,8 @@ namespace UndreamAI.LlamaLib
             llamaLib = llmBase.llamaLib;
 
             llm = llamaLib.LLMAgent_Construct(llmBase.llm, _systemPrompt ?? string.Empty);
-            if (llm == IntPtr.Zero) throw new InvalidOperationException("Failed to create LLMAgent");
+            if (llm == IntPtr.Zero)
+                throw new InvalidOperationException("Failed to create LLMAgent");
         }
 
         // Properties
@@ -110,7 +109,8 @@ namespace UndreamAI.LlamaLib
             get
             {
                 CheckLlamaLib();
-                return Marshal.PtrToStringAnsi(llamaLib.LLMAgent_Get_System_Prompt(llm)) ?? "";
+                IntPtr result = llamaLib.LLMAgent_Get_System_Prompt(llm);
+                return llamaLib.PtrToStringAndFree(result);
             }
             set
             {
@@ -126,7 +126,9 @@ namespace UndreamAI.LlamaLib
             {
                 CheckLlamaLib();
                 IntPtr result = llamaLib.LLMAgent_Get_History(llm);
-                string historyStr = Marshal.PtrToStringAnsi(result) ?? "[]";
+                string historyStr = llamaLib.PtrToStringAndFree(result);
+                if (string.IsNullOrEmpty(historyStr))
+                    historyStr = "[]";
                 try
                 {
                     return JArray.Parse(historyStr);
@@ -159,7 +161,7 @@ namespace UndreamAI.LlamaLib
                     }
                 }
             }
-            catch {}
+            catch { }
 
             return messages;
         }
@@ -233,10 +235,19 @@ namespace UndreamAI.LlamaLib
         /// <param name="strategy">Overflow strategy to use.</param>
         /// <param name="targetRatio">Target fill ratio of context after truncation (0.0–1.0, default 0.5).</param>
         /// <param name="summarizePrompt">Custom prompt for summarization; null uses the built-in default.</param>
-        public void SetOverflowStrategy(ContextOverflowStrategy strategy, float targetRatio = 0.5f, string summarizePrompt = null)
+        public void SetOverflowStrategy(
+            ContextOverflowStrategy strategy,
+            float targetRatio = 0.5f,
+            string summarizePrompt = null
+        )
         {
             CheckLlamaLib();
-            llamaLib.LLMAgent_Set_Overflow_Strategy(llm, (int)strategy, targetRatio, summarizePrompt);
+            llamaLib.LLMAgent_Set_Overflow_Strategy(
+                llm,
+                (int)strategy,
+                targetRatio,
+                summarizePrompt
+            );
         }
 
         /// <summary>
@@ -259,17 +270,135 @@ namespace UndreamAI.LlamaLib
         }
 
         // Chat functionality
-        public string Chat(string userPrompt, bool addToHistory = true, LlamaLib.CharArrayCallback callback = null, bool returnResponseJson = false, bool debugPrompt = false)
+        public string Chat(
+            string userPrompt,
+            bool addToHistory = true,
+            LlamaLib.CharArrayCallback callback = null,
+            bool returnResponseJson = false,
+            bool debugPrompt = false
+        )
         {
             CheckLlamaLib();
-            IntPtr result = llamaLib.LLMAgent_Chat(llm, userPrompt ?? string.Empty, addToHistory, callback, returnResponseJson, debugPrompt);
-            return Marshal.PtrToStringAnsi(result) ?? string.Empty;
+            IntPtr result = llamaLib.LLMAgent_Chat(
+                llm,
+                userPrompt ?? string.Empty,
+                addToHistory,
+                callback,
+                returnResponseJson,
+                debugPrompt
+            );
+            return llamaLib.PtrToStringAndFree(result);
         }
 
-        public async Task<string> ChatAsync(string userPrompt, bool addToHistory = true, LlamaLib.CharArrayCallback callback = null, bool returnResponseJson = false, bool debugPrompt = false)
+        public async Task<string> ChatAsync(
+            string userPrompt,
+            bool addToHistory = true,
+            LlamaLib.CharArrayCallback callback = null,
+            bool returnResponseJson = false,
+            bool debugPrompt = false,
+            System.Threading.CancellationToken cancellationToken = default
+        )
         {
-            return await Task.Run(() => Chat(userPrompt, addToHistory, callback, returnResponseJson, debugPrompt));
+            CheckLlamaLib();
+            if (cancellationToken.IsCancellationRequested)
+                throw new OperationCanceledException(cancellationToken);
+
+            using (
+                cancellationToken.Register(() =>
+                {
+                    try
+                    {
+                        Cancel();
+                    }
+                    catch { }
+                })
+            )
+            {
+                string result = await Task.Run(
+                        () =>
+                            Chat(
+                                userPrompt,
+                                addToHistory,
+                                callback,
+                                returnResponseJson,
+                                debugPrompt
+                            ),
+                        cancellationToken
+                    )
+                    .ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
+                return result;
+            }
         }
+
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_0_OR_GREATER
+        public async IAsyncEnumerable<string> ChatStreamAsync(
+            string userPrompt,
+            bool addToHistory = true,
+            bool returnResponseJson = false,
+            bool debugPrompt = false,
+            [System.Runtime.CompilerServices.EnumeratorCancellation]
+                System.Threading.CancellationToken cancellationToken = default
+        )
+        {
+            CheckLlamaLib();
+            var channel = System.Threading.Channels.Channel.CreateUnbounded<string>(
+                new System.Threading.Channels.UnboundedChannelOptions
+                {
+                    SingleWriter = true,
+                    SingleReader = true,
+                }
+            );
+
+            LlamaLib.CharArrayCallback callback = (text) =>
+            {
+                channel.Writer.TryWrite(text);
+            };
+
+            var chatTask = Task.Run(
+                () =>
+                {
+                    try
+                    {
+                        using (
+                            cancellationToken.Register(() =>
+                            {
+                                try
+                                {
+                                    Cancel();
+                                }
+                                catch { }
+                            })
+                        )
+                        {
+                            Chat(
+                                userPrompt,
+                                addToHistory,
+                                callback,
+                                returnResponseJson,
+                                debugPrompt
+                            );
+                        }
+                    }
+                    finally
+                    {
+                        channel.Writer.Complete();
+                    }
+                },
+                cancellationToken
+            );
+
+            while (await channel.Reader.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                while (channel.Reader.TryRead(out var chunk))
+                {
+                    yield return chunk;
+                }
+            }
+
+            await chatTask.ConfigureAwait(false);
+        }
+#endif
 
         // Override completion methods to use agent-specific implementations
         public string Completion(string prompt, LlamaLib.CharArrayCallback callback = null)
@@ -277,9 +406,14 @@ namespace UndreamAI.LlamaLib
             return Completion(prompt, callback, SlotId);
         }
 
-        public async Task<string> CompletionAsync(string prompt, LlamaLib.CharArrayCallback callback = null)
+        public async Task<string> CompletionAsync(
+            string prompt,
+            LlamaLib.CharArrayCallback callback = null,
+            System.Threading.CancellationToken cancellationToken = default
+        )
         {
-            return await Task.Run(() => Completion(prompt, callback));
+            return await CompletionAsync(prompt, callback, SlotId, cancellationToken)
+                .ConfigureAwait(false);
         }
 
         public string SaveSlot(string filepath)
@@ -289,7 +423,7 @@ namespace UndreamAI.LlamaLib
 
             CheckLlamaLib();
             IntPtr result = llamaLib.LLM_Save_Slot(llm, SlotId, filepath ?? string.Empty);
-            return Marshal.PtrToStringAnsi(result) ?? string.Empty;
+            return llamaLib.PtrToStringAndFree(result);
         }
 
         public string LoadSlot(string filepath)
@@ -299,7 +433,25 @@ namespace UndreamAI.LlamaLib
 
             CheckLlamaLib();
             IntPtr result = llamaLib.LLM_Load_Slot(llm, SlotId, filepath ?? string.Empty);
-            return Marshal.PtrToStringAnsi(result) ?? string.Empty;
+            return llamaLib.PtrToStringAndFree(result);
+        }
+
+        public async Task<string> SaveSlotAsync(
+            string filepath,
+            System.Threading.CancellationToken cancellationToken = default
+        )
+        {
+            return await Task.Run(() => SaveSlot(filepath), cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        public async Task<string> LoadSlotAsync(
+            string filepath,
+            System.Threading.CancellationToken cancellationToken = default
+        )
+        {
+            return await Task.Run(() => LoadSlot(filepath), cancellationToken)
+                .ConfigureAwait(false);
         }
 
         public void Cancel()
@@ -308,20 +460,40 @@ namespace UndreamAI.LlamaLib
             llamaLib.LLM_Cancel(llm, SlotId);
         }
 
-        // Override slot-based methods to hide them
-        private new string SaveSlot(int id_slot, string filepath)
+        public override string SaveSlot(int id_slot, string filepath)
         {
             return SaveSlot(filepath);
         }
 
-        private new string LoadSlot(int id_slot, string filepath)
+        public override string LoadSlot(int id_slot, string filepath)
         {
             return LoadSlot(filepath);
         }
 
-        private new void Cancel(int id_slot)
+        public override void Cancel(int id_slot)
         {
             Cancel();
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            lock (_disposeLock)
+            {
+                if (!disposed)
+                {
+                    if (llm != IntPtr.Zero && llamaLib != null)
+                    {
+                        try
+                        {
+                            llamaLib.LLMAgent_Delete(llm);
+                        }
+                        catch (Exception) { }
+                        llm = IntPtr.Zero;
+                    }
+                    disposed = true;
+                }
+            }
+            base.Dispose(disposing);
         }
     }
 }

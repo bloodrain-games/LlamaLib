@@ -1,12 +1,12 @@
 #pragma once
 
-#include <string>
-#include <mutex>
-#include <vector>
-#include <setjmp.h>
-#include <signal.h>
 #include <functional>
 #include <iostream>
+#include <mutex>
+#include <setjmp.h>
+#include <signal.h>
+#include <string>
+#include <vector>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -27,14 +27,11 @@ struct ErrorState
 /// @brief Error state registry for managing shared error state
 class ErrorStateRegistry
 {
-public:
+  public:
     /// @brief Inject a custom error state instance
     /// @param state Custom error state instance to use
     /// @details Allows error state injection when using different dynamic libraries
-    static void inject_error_state(ErrorState *state)
-    {
-        custom_error_state_ = state;
-    }
+    static void inject_error_state(ErrorState *state) { custom_error_state_ = state; }
 
     /// @brief Get the error state instance
     /// @return Reference to the error state instance
@@ -47,7 +44,7 @@ public:
         return error_state;
     }
 
-private:
+  private:
     static ErrorState *custom_error_state_;
 };
 
@@ -55,8 +52,8 @@ int &get_status_code();
 std::string &get_status_message();
 sigjmp_buf &get_sigjmp_buf_point();
 std::mutex &get_sigint_hook_mutex();
-sigjmp_buf* get_current_jump_point_ptr();
-void set_current_jump_point(sigjmp_buf* jump_point);
+sigjmp_buf *get_current_jump_point_ptr();
+void set_current_jump_point(sigjmp_buf *jump_point);
 std::vector<Hook> &get_sigint_hooks();
 
 void fail(std::string message, int code = 1);

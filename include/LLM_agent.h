@@ -23,16 +23,12 @@ struct UNDREAMAI_API ChatMessage
     /// @brief Parameterized constructor
     /// @param role_ Message role identifier
     /// @param content_ Message content text
-    ChatMessage(const std::string &role_, const std::string &content_)
-        : role(role_), content(content_) {}
+    ChatMessage(const std::string &role_, const std::string &content_) : role(role_), content(content_) {}
 
     /// @brief Convert message to JSON representation
     /// @return JSON object with role and content fields
     /// @details Serializes the message for storage or transmission
-    json to_json() const
-    {
-        return json{{"role", role}, {"content", content.empty() ? " " : content}};
-    }
+    json to_json() const { return json{{"role", role}, {"content", content.empty() ? " " : content}}; }
 
     /// @brief Create message from JSON representation
     /// @param j JSON object containing message data
@@ -47,41 +43,39 @@ struct UNDREAMAI_API ChatMessage
     /// @brief Equality comparison operator
     /// @param other Another ChatMessage to compare with
     /// @return true if both role and content are identical, false otherwise
-    bool operator==(const ChatMessage &other) const
-    {
-        return role == other.role && content == other.content;
-    }
+    bool operator==(const ChatMessage &other) const { return role == other.role && content == other.content; }
 };
 
 /// @brief Strategy to apply when the chat history would exceed the model's context window
 enum class ContextOverflowStrategy
 {
-    None,       ///< No automatic handling — may crash if context is exceeded
-    Truncate,   ///< Remove oldest messages (in pairs) from the front until history fits within target_context_ratio
-    Summarize   ///< Summarise the full history (rolling chunks if needed), embed it in the system message, then truncate if still needed
+    None,     ///< No automatic handling — may crash if context is exceeded
+    Truncate, ///< Remove oldest messages (in pairs) from the front until history fits within target_context_ratio
+    Summarize ///< Summarise the full history (rolling chunks if needed), embed it in the system message, then truncate
+              ///< if still needed
 };
 
-const std::string SUMMARY_PROMPT=
-"You are maintaining a concise working memory of an ongoing conversation."
-""
-"If an existing summary is provided, merge it with the new messages into a single updated summary."
-"If no existing summary is provided, create a new summary from the messages."
-""
-"Rules:"
-"- Preserve user goals, decisions made, constraints, preferences, open questions, and pending tasks."
-"- Remove anything resolved, superseded, redundant, or purely conversational."
-"- Keep only information relevant for future reasoning."
-"- Avoid duplicating or rephrasing information unnecessarily."
-"- Write in present tense where possible."
-"- Keep under 200 words."
-"- No bullet points. No preamble. Output only the summary text.";
+const std::string SUMMARY_PROMPT =
+    "You are maintaining a concise working memory of an ongoing conversation."
+    ""
+    "If an existing summary is provided, merge it with the new messages into a single updated summary."
+    "If no existing summary is provided, create a new summary from the messages."
+    ""
+    "Rules:"
+    "- Preserve user goals, decisions made, constraints, preferences, open questions, and pending tasks."
+    "- Remove anything resolved, superseded, redundant, or purely conversational."
+    "- Keep only information relevant for future reasoning."
+    "- Avoid duplicating or rephrasing information unnecessarily."
+    "- Write in present tense where possible."
+    "- Keep under 200 words."
+    "- No bullet points. No preamble. Output only the summary text.";
 
 /// @brief High-level conversational agent for LLM interactions
 /// @details Provides a conversation-aware interface that manages chat history
 /// and applies chat template formatting
 class UNDREAMAI_API LLMAgent : public LLMLocal
 {
-public:
+  public:
     const std::string USER_ROLE = "user";
     const std::string ASSISTANT_ROLE = "assistant";
 
@@ -89,7 +83,14 @@ public:
     /// @param llm Pointer to LLMLocal instance to wrap
     /// @param system_prompt Initial system prompt for conversation context
     /// @details Creates an agent that manages conversations with the specified LLM backend
-    LLMAgent(LLMLocal *llm, const std::string &system_prompt = "");
+    explicit LLMAgent(LLMLocal *llm, const std::string &system_prompt = "");
+
+    using LLMLocal::build_completion_json;
+    using LLMLocal::build_slot_json;
+    using LLMLocal::cancel;
+    using LLMLocal::completion;
+    using LLMLocal::load_slot;
+    using LLMLocal::save_slot;
 
     //=================================== LLM METHOD DELEGATES ===================================//
     /// @brief Tokenize input (override)
@@ -114,7 +115,10 @@ public:
     /// @param callback Optional streaming callback
     /// @param callbackWithJSON Whether callback uses JSON
     /// @return Generated completion
-    std::string completion_json(const json &data, CharArrayFn callback = nullptr, bool callbackWithJSON = true) override { return llm->completion_json(data, callback, callbackWithJSON); }
+    std::string completion_json(const json &data, CharArrayFn callback = nullptr, bool callbackWithJSON = true) override
+    {
+        return llm->completion_json(data, callback, callbackWithJSON);
+    }
 
     /// @brief Apply a chat template to message data
     /// @param data JSON object containing messages to format
@@ -147,7 +151,10 @@ public:
     /// @param prompt Input prompt text
     /// @return JSON object for completion request
     /// @details Override that automatically uses the agent's assigned slot
-    virtual json build_completion_json(const std::string &prompt) { return LLMLocal::build_completion_json(prompt, this->id_slot); }
+    virtual json build_completion_json(const std::string &prompt)
+    {
+        return LLMLocal::build_completion_json(prompt, this->id_slot);
+    }
 
     /// @brief Generate completion with agent's slot
     /// @param prompt Input prompt text
@@ -155,7 +162,8 @@ public:
     /// @param return_response_json Whether to return JSON response
     /// @return Generated completion text or JSON
     /// @details Override that automatically uses the agent's assigned slot
-    virtual std::string completion(const std::string &prompt, CharArrayFn callback = nullptr, bool return_response_json = false)
+    virtual std::string completion(const std::string &prompt, CharArrayFn callback = nullptr,
+                                   bool return_response_json = false)
     {
         return LLMLocal::completion(prompt, callback, this->id_slot, return_response_json);
     }
@@ -165,7 +173,10 @@ public:
     /// @param filepath File path for slot operation
     /// @return JSON object for slot operation
     /// @details Override that automatically uses the agent's assigned slot
-    virtual json build_slot_json(const std::string &action, const std::string &filepath) { return LLMLocal::build_slot_json(this->id_slot, action, filepath); }
+    virtual json build_slot_json(const std::string &action, const std::string &filepath)
+    {
+        return LLMLocal::build_slot_json(this->id_slot, action, filepath);
+    }
 
     /// @brief Save agent's slot state
     /// @param filepath Path to save slot state
@@ -256,11 +267,8 @@ public:
     /// @param strategy The overflow strategy to use
     /// @param target_ratio Fraction of context to target after truncation (0.0–1.0, default 0.5)
     /// @param summarize_prompt Prompt used to ask the LLM to summarise the history
-    void set_overflow_strategy(
-        ContextOverflowStrategy strategy,
-        float target_ratio = 0.5f,
-        const std::string &summarize_prompt = SUMMARY_PROMPT
-    )
+    void set_overflow_strategy(ContextOverflowStrategy strategy, float target_ratio = 0.5f,
+                               const std::string &summarize_prompt = SUMMARY_PROMPT)
     {
         overflow_strategy = strategy;
         target_context_ratio = target_ratio;
@@ -290,9 +298,10 @@ public:
     /// @return Assistant's response text or JSON
     /// @details Main chat method that processes user input, applies conversation context,
     /// generates a response, and optionally updates conversation history
-    std::string chat(const std::string &user_prompt, bool add_to_history = true, CharArrayFn callback = nullptr, bool return_response_json = false, bool debug_prompt = false);
+    std::string chat(const std::string &user_prompt, bool add_to_history = true, CharArrayFn callback = nullptr,
+                     bool return_response_json = false, bool debug_prompt = false);
 
-protected:
+  protected:
     void set_n_keep();
 
     /// @brief Builds the history to send to the model including only the prompts
@@ -303,7 +312,7 @@ protected:
     /// @param user_prompt The current user message to append
     /// @param include_history Whether to include the chat history
     /// @return JSON array: [system+summary, ...history, user_prompt]
-    json build_working_history(const std::string &user_prompt, bool include_history=true) const;
+    json build_working_history(const std::string &user_prompt, bool include_history = true) const;
 
     /// @brief Handle context overflow using the configured strategy before a chat call
     /// @param user_prompt The user prompt string about to be sent
@@ -313,7 +322,8 @@ protected:
     /// @brief Remove oldest message pairs from the front until history fits within target_context_ratio
     void truncate_history(const std::string &user_prompt);
 
-    /// @brief Summarise the entire history (chunking if needed), embed summary in system message, then truncate if still needed
+    /// @brief Summarise the entire history (chunking if needed), embed summary in system message, then truncate if
+    /// still needed
     void summarize_history(const std::string &user_prompt);
 
     /// @brief Add a message to conversation history
@@ -322,17 +332,17 @@ protected:
     /// @details Appends a new message to the conversation history
     virtual void add_message(const std::string &role, const std::string &content);
 
-private:
-    LLMLocal *llm = nullptr;                  ///< Wrapped LLM instance
-    int id_slot = -1;                         ///< Assigned processing slot ID
-    std::string system_prompt = "";           ///< System prompt for conversation context
-    std::string system_role = "system";       ///< Role identifier for system messages
-    std::string summary = "";                 ///< Rolling summary embedded into the system message by Summarize strategy
-    json history;                             ///< Conversation history as JSON array
+  private:
+    LLMLocal *llm = nullptr;            ///< Wrapped LLM instance
+    int id_slot = -1;                   ///< Assigned processing slot ID
+    std::string system_prompt = "";     ///< System prompt for conversation context
+    std::string system_role = "system"; ///< Role identifier for system messages
+    std::string summary = "";           ///< Rolling summary embedded into the system message by Summarize strategy
+    json history;                       ///< Conversation history as JSON array
 
     // Context overflow
     ContextOverflowStrategy overflow_strategy = ContextOverflowStrategy::Truncate;
-    float target_context_ratio = 0.5f;        ///< Target fill ratio after truncation (0.0–1.0)
+    float target_context_ratio = 0.5f; ///< Target fill ratio after truncation (0.0–1.0)
     std::string summarize_prompt = SUMMARY_PROMPT;
 };
 
@@ -378,7 +388,9 @@ extern "C"
     /// @param debug_prompt Whether to display the complete prompt (default: false)
     /// @return Generated assistant response
     /// @details Main chat method for conversational interactions
-    UNDREAMAI_API const char *LLMAgent_Chat(LLMAgent *llm, const char *user_prompt, bool add_to_history = true, CharArrayFn callback = nullptr, bool return_response_json = false, bool debug_prompt = false);
+    UNDREAMAI_API const char *LLMAgent_Chat(LLMAgent *llm, const char *user_prompt, bool add_to_history = true,
+                                            CharArrayFn callback = nullptr, bool return_response_json = false,
+                                            bool debug_prompt = false);
 
     /// @brief Clear conversation history (C API)
     /// @param llm LLMAgent instance pointer
@@ -435,7 +447,8 @@ extern "C"
     /// @param strategy 0=None, 1=Truncate, 2=Summarize
     /// @param target_ratio Target fill ratio after truncation (0.0–1.0)
     /// @param summarize_prompt Prompt used for summarization (nullptr = use default)
-    UNDREAMAI_API void LLMAgent_Set_Overflow_Strategy(LLMAgent *llm, int strategy, float target_ratio, const char *summarize_prompt);
+    UNDREAMAI_API void LLMAgent_Set_Overflow_Strategy(LLMAgent *llm, int strategy, float target_ratio,
+                                                      const char *summarize_prompt);
 
     /// @brief Get the current rolling summary (C API)
     /// @param llm LLMAgent instance pointer
@@ -446,6 +459,10 @@ extern "C"
     /// @param llm LLMAgent instance pointer
     /// @param summary Summary string to restore
     UNDREAMAI_API void LLMAgent_Set_Summary(LLMAgent *llm, const char *summary);
+
+    /// @brief Delete LLMAgent (C API)
+    /// @param llm LLMAgent instance pointer
+    UNDREAMAI_API void LLMAgent_Delete(LLMAgent *llm);
 }
 
 /// @}

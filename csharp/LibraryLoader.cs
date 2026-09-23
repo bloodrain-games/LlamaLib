@@ -21,11 +21,29 @@ namespace UndreamAI.LlamaLib
         /// <param name="library">library handle</param>
         /// <param name="name">function name</param>
         /// <returns>function delegate</returns>
-        public static T GetSymbolDelegate<T>(IntPtr library, string name) where T : Delegate
+        public static T GetSymbolDelegate<T>(IntPtr library, string name)
+            where T : Delegate
         {
             var symbol = GetSymbol(library, name);
             if (symbol == IntPtr.Zero)
                 throw new EntryPointNotFoundException($"Unable to load symbol '{name}'.");
+
+            return Marshal.GetDelegateForFunctionPointer<T>(symbol);
+        }
+
+        /// <summary>
+        /// Allows to retrieve an optional function delegate for the library, returning null if not found
+        /// </summary>
+        /// <typeparam name="T">type to cast the function</typeparam>
+        /// <param name="library">library handle</param>
+        /// <param name="name">function name</param>
+        /// <returns>function delegate or null</returns>
+        public static T GetSymbolDelegateOrDefault<T>(IntPtr library, string name)
+            where T : Delegate
+        {
+            var symbol = GetSymbol(library, name);
+            if (symbol == IntPtr.Zero)
+                return null;
 
             return Marshal.GetDelegateForFunctionPointer<T>(symbol);
         }
@@ -49,7 +67,10 @@ namespace UndreamAI.LlamaLib
                 return Linux.dlopen(libraryPath);
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
                 return Mac.dlopen(libraryPath);
-            else throw new PlatformNotSupportedException($"Current platform is unknown, unable to load library '{libraryPath}'.");
+            else
+                throw new PlatformNotSupportedException(
+                    $"Current platform is unknown, unable to load library '{libraryPath}'."
+                );
 #endif
         }
 
@@ -73,7 +94,10 @@ namespace UndreamAI.LlamaLib
                 return Linux.dlsym(library, symbolName);
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
                 return Mac.dlsym(library, symbolName);
-            else throw new PlatformNotSupportedException($"Current platform is unknown, unable to load symbol '{symbolName}' from library {library}.");
+            else
+                throw new PlatformNotSupportedException(
+                    $"Current platform is unknown, unable to load symbol '{symbolName}' from library {library}."
+                );
 #endif
         }
 
@@ -95,7 +119,10 @@ namespace UndreamAI.LlamaLib
                 Linux.dlclose(library);
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
                 Mac.dlclose(library);
-            else throw new PlatformNotSupportedException($"Current platform is unknown, unable to close library '{library}'.");
+            else
+                throw new PlatformNotSupportedException(
+                    $"Current platform is unknown, unable to close library '{library}'."
+                );
 #endif
         }
 

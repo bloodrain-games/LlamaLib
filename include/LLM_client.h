@@ -6,22 +6,23 @@
 
 #pragma once
 
-#include <vector>
-#include <thread>
-#include <chrono>
-#include <iostream>
-#include <sstream>
 #include "LLM.h"
 #include "completion_processor.h"
+#include <chrono>
+#include <iostream>
+#include <mutex>
+#include <sstream>
+#include <thread>
+#include <vector>
 
 #if TARGET_OS_IOS || TARGET_OS_VISION
-    #include "ios_http_transport.h"
+#include "ios_http_transport.h"
 #else
-    // increase max payload length to allow use of larger context size
-    #define CPPHTTPLIB_FORM_URL_ENCODED_PAYLOAD_MAX_LENGTH 1048576
-    // disable Nagle's algorithm
-    #define CPPHTTPLIB_TCP_NODELAY true
-    #include "httplib.h"
+// increase max payload length to allow use of larger context size
+#define CPPHTTPLIB_FORM_URL_ENCODED_PAYLOAD_MAX_LENGTH 1048576
+// disable Nagle's algorithm
+#define CPPHTTPLIB_TCP_NODELAY true
+#include "httplib.h"
 #endif
 
 /// @brief Client for accessing LLM functionality locally or remotely
@@ -30,11 +31,11 @@
 /// including completion, tokenization, embeddings, and slot management.
 class UNDREAMAI_API LLMClient : public LLMLocal
 {
-public:
+  public:
     /// @brief Constructor for local LLM access
     /// @param llm Pointer to local LLMProvider instance
     /// @details Creates a client that directly accesses a local LLM provider
-    LLMClient(LLMProvider *llm);
+    explicit LLMClient(LLMProvider *llm);
 
     /// @brief Constructor for remote LLM access
     /// @param url Server URL or hostname
@@ -45,7 +46,6 @@ public:
 
     /// @brief Destructor
     ~LLMClient();
-
 
     bool is_server_alive();
 
@@ -83,7 +83,8 @@ public:
     /// @param callback Optional callback for streaming responses
     /// @param callbackWithJSON Whether callback receives JSON format
     /// @return Generated completion text or JSON
-    std::string completion_json(const json &data, CharArrayFn callback = nullptr, bool callbackWithJSON = true) override;
+    std::string completion_json(const json &data, CharArrayFn callback = nullptr,
+                                bool callbackWithJSON = true) override;
 
     /// @brief Apply a chat template to message data
     /// @param data JSON object containing messages to format
@@ -110,7 +111,7 @@ public:
     int get_slot_context_size() override;
     //=================================== LLM METHODS END ===================================//
 
-private:
+  private:
     // Local LLM members
     LLMProvider *llm = nullptr; ///< Pointer to local LLM provider (null for remote clients)
 #if TARGET_OS_IOS || TARGET_OS_VISION
@@ -127,8 +128,8 @@ private:
     std::string API_key = "";  ///< API key for accessing remote server
     std::string SSL_cert = ""; ///< SSL certificate path for remote clients
     int max_retries = 5;
-    std::vector<bool*> active_requests;
-
+    std::vector<bool *> active_requests;
+    std::mutex active_requests_mutex;
 
     /// @brief Send HTTP POST request to remote server
     /// @param path API endpoint path
@@ -137,7 +138,8 @@ private:
     /// @param callbackWithJSON Whether callback receives JSON format
     /// @return HTTP response body
     /// @details Internal method for communicating with remote LLM servers
-    std::string post_request(const std::string &path, const json &payload, CharArrayFn callback = nullptr, bool callbackWithJSON = true);
+    std::string post_request(const std::string &path, const json &payload, CharArrayFn callback = nullptr,
+                             bool callbackWithJSON = true);
 };
 
 /// @ingroup c_api
@@ -165,6 +167,10 @@ extern "C"
     /// @return Pointer to new LLMClient instance
     /// @details Creates a client for remote LLM server access
     UNDREAMAI_API LLMClient *LLMClient_Construct_Remote(const char *url, const int port, const char *API_key = "");
+
+    /// @brief Delete LLMClient (C API)
+    /// @param llm LLMClient instance pointer
+    UNDREAMAI_API void LLMClient_Delete(LLMClient *llm);
 }
 
 /// @}

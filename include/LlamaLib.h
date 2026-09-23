@@ -5,8 +5,8 @@
 /// service implementation, runtime loading, and client functionality
 
 #include "LLM.h"
-#include "LLM_client.h" ///< Client implementation for local/remote LLM access
 #include "LLM_agent.h"  ///< Agent implementation with memomy management
+#include "LLM_client.h" ///< Client implementation for local/remote LLM access
 
 #ifdef USE_RUNTIME_DETECTION
 #include "LLM_runtime.h" ///< Dynamic library loading and runtime management

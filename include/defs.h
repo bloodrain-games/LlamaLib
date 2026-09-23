@@ -96,8 +96,3 @@ extern "C"
 {
     UNDREAMAI_API void CharArray_Delete(char *object);
 }
-
-inline void CharArray_Delete(char *str)
-{
-    delete[] str;
-}

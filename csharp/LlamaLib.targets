@@ -17,19 +17,21 @@
 
     <!-- CPU default flags -->
     <LlamaLibUseAvx512 Condition="'$(LlamaLibUseAvx512)' == ''">false</LlamaLibUseAvx512>
-    <LlamaLibUseAvx2   Condition="'$(LlamaLibUseAvx2)'   == ''">false</LlamaLibUseAvx2>
-    <LlamaLibUseAvx    Condition="'$(LlamaLibUseAvx)'    == ''">false</LlamaLibUseAvx>
-    <LlamaLibUseNoAvx  Condition="'$(LlamaLibUseNoAvx)'  == ''">false</LlamaLibUseNoAvx>
+    <LlamaLibUseAvx2 Condition="'$(LlamaLibUseAvx2)'   == ''">false</LlamaLibUseAvx2>
+    <LlamaLibUseAvx Condition="'$(LlamaLibUseAvx)'    == ''">false</LlamaLibUseAvx>
+    <LlamaLibUseNoAvx Condition="'$(LlamaLibUseNoAvx)'  == ''">false</LlamaLibUseNoAvx>
 
     <!-- GPU default flags -->
-    <LlamaLibUseCublas   Condition="'$(LlamaLibUseCublas)'   == ''">false</LlamaLibUseCublas>
+    <LlamaLibUseCublas Condition="'$(LlamaLibUseCublas)'   == ''">false</LlamaLibUseCublas>
     <LlamaLibUseTinyblas Condition="'$(LlamaLibUseTinyblas)' == ''">false</LlamaLibUseTinyblas>
-    <LlamaLibUseVulkan   Condition="'$(LlamaLibUseVulkan)'   == ''">false</LlamaLibUseVulkan>
-    <LlamaLibUseHip      Condition="'$(LlamaLibUseHip)'      == ''">false</LlamaLibUseHip>
+    <LlamaLibUseVulkan Condition="'$(LlamaLibUseVulkan)'   == ''">false</LlamaLibUseVulkan>
+    <LlamaLibUseHip Condition="'$(LlamaLibUseHip)'      == ''">false</LlamaLibUseHip>
 
     <!-- Accelerate -->
-    <LlamaLibUseAccelerate Condition="'$(LlamaLibUseAccelerate)' == ''">false</LlamaLibUseAccelerate>
-    <LlamaLibUseNoAccelerate Condition="'$(LlamaLibUseNoAccelerate)' == ''">false</LlamaLibUseNoAccelerate>
+    <LlamaLibUseAccelerate Condition="'$(LlamaLibUseAccelerate)' == ''"
+      >false</LlamaLibUseAccelerate>
+    <LlamaLibUseNoAccelerate Condition="'$(LlamaLibUseNoAccelerate)' == ''"
+      >false</LlamaLibUseNoAccelerate>
     <LlamaLibUseIOS Condition="'$(LlamaLibUseIOS)' == ''">false</LlamaLibUseIOS>
     <LlamaLibVisionOS Condition="'$(LlamaLibVisionOS)' == ''">false</LlamaLibVisionOS>
   </PropertyGroup>
@@ -41,23 +43,33 @@
     <PropertyGroup>
       <!-- Detect if we're on Linux or Windows -->
       <_IsLinuxOrWindows>false</_IsLinuxOrWindows>
-      <_IsLinuxOrWindows Condition="'$(RuntimeIdentifier)' != '' AND ($(RuntimeIdentifier.StartsWith('linux')) OR $(RuntimeIdentifier.StartsWith('win')))">true</_IsLinuxOrWindows>
+      <_IsLinuxOrWindows
+        Condition="'$(RuntimeIdentifier)' != '' AND ($(RuntimeIdentifier.StartsWith('linux')) OR $(RuntimeIdentifier.StartsWith('win')))"
+        >true</_IsLinuxOrWindows>
     </PropertyGroup>
 
     <PropertyGroup Condition="'$(_IsLinuxOrWindows)' == 'true'">
       <!-- Count CPU options -->
       <_CpuOptionsCount>0</_CpuOptionsCount>
-      <_CpuOptionsCount Condition="'$(LlamaLibUseAvx512)' == 'true'">$([MSBuild]::Add($(_CpuOptionsCount), 1))</_CpuOptionsCount>
-      <_CpuOptionsCount Condition="'$(LlamaLibUseAvx2)' == 'true'">$([MSBuild]::Add($(_CpuOptionsCount), 1))</_CpuOptionsCount>
-      <_CpuOptionsCount Condition="'$(LlamaLibUseAvx)' == 'true'">$([MSBuild]::Add($(_CpuOptionsCount), 1))</_CpuOptionsCount>
-      <_CpuOptionsCount Condition="'$(LlamaLibUseNoAvx)' == 'true'">$([MSBuild]::Add($(_CpuOptionsCount), 1))</_CpuOptionsCount>
+      <_CpuOptionsCount Condition="'$(LlamaLibUseAvx512)' == 'true'"
+        >$([MSBuild]::Add($(_CpuOptionsCount), 1))</_CpuOptionsCount>
+      <_CpuOptionsCount Condition="'$(LlamaLibUseAvx2)' == 'true'"
+        >$([MSBuild]::Add($(_CpuOptionsCount), 1))</_CpuOptionsCount>
+      <_CpuOptionsCount Condition="'$(LlamaLibUseAvx)' == 'true'"
+        >$([MSBuild]::Add($(_CpuOptionsCount), 1))</_CpuOptionsCount>
+      <_CpuOptionsCount Condition="'$(LlamaLibUseNoAvx)' == 'true'"
+        >$([MSBuild]::Add($(_CpuOptionsCount), 1))</_CpuOptionsCount>
 
       <!-- Count GPU options -->
       <_GpuOptionsCount>0</_GpuOptionsCount>
-      <_GpuOptionsCount Condition="'$(LlamaLibUseCublas)' == 'true'">$([MSBuild]::Add($(_GpuOptionsCount), 1))</_GpuOptionsCount>
-      <_GpuOptionsCount Condition="'$(LlamaLibUseTinyblas)' == 'true'">$([MSBuild]::Add($(_GpuOptionsCount), 1))</_GpuOptionsCount>
-      <_GpuOptionsCount Condition="'$(LlamaLibUseVulkan)' == 'true'">$([MSBuild]::Add($(_GpuOptionsCount), 1))</_GpuOptionsCount>
-      <_GpuOptionsCount Condition="'$(LlamaLibUseHip)' == 'true'">$([MSBuild]::Add($(_GpuOptionsCount), 1))</_GpuOptionsCount>
+      <_GpuOptionsCount Condition="'$(LlamaLibUseCublas)' == 'true'"
+        >$([MSBuild]::Add($(_GpuOptionsCount), 1))</_GpuOptionsCount>
+      <_GpuOptionsCount Condition="'$(LlamaLibUseTinyblas)' == 'true'"
+        >$([MSBuild]::Add($(_GpuOptionsCount), 1))</_GpuOptionsCount>
+      <_GpuOptionsCount Condition="'$(LlamaLibUseVulkan)' == 'true'"
+        >$([MSBuild]::Add($(_GpuOptionsCount), 1))</_GpuOptionsCount>
+      <_GpuOptionsCount Condition="'$(LlamaLibUseHip)' == 'true'"
+        >$([MSBuild]::Add($(_GpuOptionsCount), 1))</_GpuOptionsCount>
 
       <!-- Total options count -->
       <_TotalOptionsCount>$([MSBuild]::Add($(_CpuOptionsCount), $(_GpuOptionsCount)))</_TotalOptionsCount>
@@ -83,37 +95,98 @@
   <!-- ============================== -->
   <!-- Download & unzip the package   -->
   <!-- ============================== -->
-  <Target Name="DownloadLlamaLibNatives" AfterTargets="ConfigureLlamaLibOptions" BeforeTargets="BeforeBuild">
+  <Target
+    Name="DownloadLlamaLibNatives"
+    AfterTargets="ConfigureLlamaLibOptions"
+    BeforeTargets="BeforeBuild"
+  >
     <MakeDir Directories="$(LlamaLibCacheDir)" />
-    <Message Text="Downloading LlamaLib $(LlamaLibVersion)" Importance="high" Condition="!Exists('$(LlamaLibZipFile)') AND !Exists('$(LlamaLibExtractDir)')" />
-    <DownloadFile SourceUrl="$(LlamaLibReleaseUrl)" DestinationFolder="$(LlamaLibCacheDir)" DestinationFileName="$(LlamaLibZipName).zip" Condition="!Exists('$(LlamaLibZipFile)') AND !Exists('$(LlamaLibExtractDir)')" />
-    <Message Text="Extracting LlamaLib to $(LlamaLibCacheDir)" Importance="high" Condition="!Exists('$(LlamaLibExtractDir)')" />
-    <Unzip SourceFiles="$(LlamaLibZipFile)" DestinationFolder="$(LlamaLibCacheDir)" Condition="!Exists('$(LlamaLibExtractDir)')" />
+    <Message
+      Text="Downloading LlamaLib $(LlamaLibVersion)"
+      Importance="high"
+      Condition="!Exists('$(LlamaLibZipFile)') AND !Exists('$(LlamaLibExtractDir)')"
+    />
+    <DownloadFile
+      SourceUrl="$(LlamaLibReleaseUrl)"
+      DestinationFolder="$(LlamaLibCacheDir)"
+      DestinationFileName="$(LlamaLibZipName).zip"
+      Condition="!Exists('$(LlamaLibZipFile)') AND !Exists('$(LlamaLibExtractDir)')"
+    />
+    <Message
+      Text="Extracting LlamaLib to $(LlamaLibCacheDir)"
+      Importance="high"
+      Condition="!Exists('$(LlamaLibExtractDir)')"
+    />
+    <Unzip
+      SourceFiles="$(LlamaLibZipFile)"
+      DestinationFolder="$(LlamaLibCacheDir)"
+      Condition="!Exists('$(LlamaLibExtractDir)')"
+    />
   </Target>
 
   <!-- ============================== -->
   <!-- Pick the runtime files        -->
   <!-- ============================== -->
-  <Target Name="SelectLlamaLibRuntimeFiles" AfterTargets="DownloadLlamaLibNatives" BeforeTargets="CopyLlamaLibNatives">
+  <Target
+    Name="SelectLlamaLibRuntimeFiles"
+    AfterTargets="DownloadLlamaLibNatives"
+    BeforeTargets="CopyLlamaLibNatives"
+  >
     <ItemGroup Condition="'$(RuntimeIdentifier)' != ''">
       <!-- CPU -->
-      <_LlamaRuntime Include="$(LlamaLibExtractDir)/runtimes/$(RuntimeIdentifier)/native/*_avx512.*" Condition="'$(LlamaLibUseAvx512)' == 'true'" />
-      <_LlamaRuntime Include="$(LlamaLibExtractDir)/runtimes/$(RuntimeIdentifier)/native/*_avx2.*"   Condition="'$(LlamaLibUseAvx2)'   == 'true'" />
-      <_LlamaRuntime Include="$(LlamaLibExtractDir)/runtimes/$(RuntimeIdentifier)/native/*_avx.*"    Condition="'$(LlamaLibUseAvx)'    == 'true'" />
-      <_LlamaRuntime Include="$(LlamaLibExtractDir)/runtimes/$(RuntimeIdentifier)/native/*_noavx.*"  Condition="'$(LlamaLibUseNoAvx)'  == 'true'" />
+      <_LlamaRuntime
+        Include="$(LlamaLibExtractDir)/runtimes/$(RuntimeIdentifier)/native/*_avx512.*"
+        Condition="'$(LlamaLibUseAvx512)' == 'true'"
+      />
+      <_LlamaRuntime
+        Include="$(LlamaLibExtractDir)/runtimes/$(RuntimeIdentifier)/native/*_avx2.*"
+        Condition="'$(LlamaLibUseAvx2)'   == 'true'"
+      />
+      <_LlamaRuntime
+        Include="$(LlamaLibExtractDir)/runtimes/$(RuntimeIdentifier)/native/*_avx.*"
+        Condition="'$(LlamaLibUseAvx)'    == 'true'"
+      />
+      <_LlamaRuntime
+        Include="$(LlamaLibExtractDir)/runtimes/$(RuntimeIdentifier)/native/*_noavx.*"
+        Condition="'$(LlamaLibUseNoAvx)'  == 'true'"
+      />
 
       <!-- GPU -->
-      <_LlamaRuntime Include="$(LlamaLibExtractDir)/runtimes/$(RuntimeIdentifier)/native/*_tinyblas.*" Condition="'$(LlamaLibUseTinyblas)' == 'true'" />
-      <_LlamaRuntime Include="$(LlamaLibExtractDir)/runtimes/$(RuntimeIdentifier)/native/*cublas*"   Condition="'$(LlamaLibUseCublas)'   == 'true'" />
-      <_LlamaRuntime Include="$(LlamaLibExtractDir)/runtimes/$(RuntimeIdentifier)/native/*cudart*"   Condition="'$(LlamaLibUseCublas)'   == 'true'" />
-      <_LlamaRuntime Include="$(LlamaLibExtractDir)/runtimes/$(RuntimeIdentifier)/native/*vulkan*"   Condition="'$(LlamaLibUseVulkan)'   == 'true'" />
-      <_LlamaRuntime Include="$(LlamaLibExtractDir)/runtimes/$(RuntimeIdentifier)/native/*hip*"      Condition="'$(LlamaLibUseHip)'      == 'true'" />
+      <_LlamaRuntime
+        Include="$(LlamaLibExtractDir)/runtimes/$(RuntimeIdentifier)/native/*_tinyblas.*"
+        Condition="'$(LlamaLibUseTinyblas)' == 'true'"
+      />
+      <_LlamaRuntime
+        Include="$(LlamaLibExtractDir)/runtimes/$(RuntimeIdentifier)/native/*cublas*"
+        Condition="'$(LlamaLibUseCublas)'   == 'true'"
+      />
+      <_LlamaRuntime
+        Include="$(LlamaLibExtractDir)/runtimes/$(RuntimeIdentifier)/native/*cudart*"
+        Condition="'$(LlamaLibUseCublas)'   == 'true'"
+      />
+      <_LlamaRuntime
+        Include="$(LlamaLibExtractDir)/runtimes/$(RuntimeIdentifier)/native/*vulkan*"
+        Condition="'$(LlamaLibUseVulkan)'   == 'true'"
+      />
+      <_LlamaRuntime
+        Include="$(LlamaLibExtractDir)/runtimes/$(RuntimeIdentifier)/native/*hip*"
+        Condition="'$(LlamaLibUseHip)'      == 'true'"
+      />
 
       <!-- Accelerate -->
-      <_LlamaRuntime Include="$(LlamaLibExtractDir)/runtimes/$(RuntimeIdentifier)/native/*_acc.*"  Condition="'$(LlamaLibUseAccelerate)'  == 'true'" />
-      <_LlamaRuntime Include="$(LlamaLibExtractDir)/runtimes/$(RuntimeIdentifier)/native/*_no-acc.*"  Condition="'$(LlamaLibUseNoAccelerate)'  == 'true'" />
+      <_LlamaRuntime
+        Include="$(LlamaLibExtractDir)/runtimes/$(RuntimeIdentifier)/native/*_acc.*"
+        Condition="'$(LlamaLibUseAccelerate)'  == 'true'"
+      />
+      <_LlamaRuntime
+        Include="$(LlamaLibExtractDir)/runtimes/$(RuntimeIdentifier)/native/*_no-acc.*"
+        Condition="'$(LlamaLibUseNoAccelerate)'  == 'true'"
+      />
 
-      <_LlamaRuntime Include="$(LlamaLibExtractDir)/runtimes/visionos-arm64/native/*"  Condition="'$(LlamaLibVisionOS)'  == 'true'" />
+      <_LlamaRuntime
+        Include="$(LlamaLibExtractDir)/runtimes/visionos-arm64/native/*"
+        Condition="'$(LlamaLibVisionOS)'  == 'true'"
+      />
     </ItemGroup>
 
     <!-- Fallback: if nothing selected and we have a RuntimeIdentifier, copy everything -->
@@ -141,20 +214,31 @@
   <!-- ============================== -->
   <!-- Copy & publish runtime files  -->
   <!-- ============================== -->
-  <Target Name="CopyLlamaLibNatives" AfterTargets="SelectLlamaLibRuntimeFiles" BeforeTargets="Build">
+  <Target
+    Name="CopyLlamaLibNatives"
+    AfterTargets="SelectLlamaLibRuntimeFiles"
+    BeforeTargets="Build"
+  >
     <MakeDir Directories="$(LlamaLibRuntimeDir)" Condition="'$(RuntimeIdentifier)' != ''" />
-    
+
     <!-- Copy for specific RuntimeIdentifier -->
-    <Copy SourceFiles="@(_LlamaRuntime)"
-          DestinationFolder="$(LlamaLibRuntimeDir)"
-          Condition="'$(RuntimeIdentifier)' != '' AND '@(_LlamaRuntime)' != ''" />
-    
-    <Message Importance="high" Text="Copied @(_LlamaRuntime->Count()) files to $(LlamaLibRuntimeDir)" />
+    <Copy
+      SourceFiles="@(_LlamaRuntime)"
+      DestinationFolder="$(LlamaLibRuntimeDir)"
+      Condition="'$(RuntimeIdentifier)' != '' AND '@(_LlamaRuntime)' != ''"
+    />
+
+    <Message
+      Importance="high"
+      Text="Copied @(_LlamaRuntime->Count()) files to $(LlamaLibRuntimeDir)"
+    />
 
     <!-- Copy for portable build (no RuntimeIdentifier) - preserve entire structure -->
-    <Copy SourceFiles="@(_LlamaRuntimePortable)"
-          DestinationFiles="@(_LlamaRuntimePortable->'$(OutputPath)runtimes/%(RecursiveDir)%(Filename)%(Extension)')"
-          Condition="'$(RuntimeIdentifier)' == '' AND '@(_LlamaRuntimePortable)' != ''" />
+    <Copy
+      SourceFiles="@(_LlamaRuntimePortable)"
+      DestinationFiles="@(_LlamaRuntimePortable->'$(OutputPath)runtimes/%(RecursiveDir)%(Filename)%(Extension)')"
+      Condition="'$(RuntimeIdentifier)' == '' AND '@(_LlamaRuntimePortable)' != ''"
+    />
 
     <ItemGroup>
       <Content Include="$(OutputPath)runtimes/**/*">

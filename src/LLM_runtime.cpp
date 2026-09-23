@@ -220,18 +220,25 @@ LibHandle load_library_safe(const std::string &path)
     return handle_out;
 }
 
-bool LLMService::create_LLM_library_backend(const std::string &command, const std::string &llm_lib_filename, bool is_gpu_library)
+bool LLMService::create_LLM_library_backend(const std::string &command, const std::string &llm_lib_filename,
+                                            bool is_gpu_library)
 {
     sigjmp_buf local_jump_point;
-    sigjmp_buf* old_jump_point = get_current_jump_point_ptr(); // Save the old one
-    set_current_jump_point(&local_jump_point); // Switch to our local one
+    sigjmp_buf *old_jump_point = get_current_jump_point_ptr(); // Save the old one
+    set_current_jump_point(&local_jump_point);                 // Switch to our local one
 
     if (sigsetjmp(local_jump_point, 1) != 0)
     {
         std::cerr << "Error occurred while loading backend: " << llm_lib_filename << std::endl;
         if (handle)
         {
-            try { unload_library(handle); } catch (...) {}
+            try
+            {
+                unload_library(handle);
+            }
+            catch (...)
+            {
+            }
             handle = nullptr;
         }
         fail("", 0);
@@ -265,23 +272,25 @@ bool LLMService::create_LLM_library_backend(const std::string &command, const st
             if (!handle)
                 continue;
 
-#define DECLARE_AND_LOAD(name, ret, ...) \
-    load_sym(this->name, #name);         \
-    if (!this->name)                     \
-    {                                    \
-        set_current_jump_point(old_jump_point); \
-        return false;                    \
+#define DECLARE_AND_LOAD(name, ret, ...)                                                                               \
+    load_sym(this->name, #name);                                                                                       \
+    if (!this->name)                                                                                                   \
+    {                                                                                                                  \
+        set_current_jump_point(old_jump_point);                                                                        \
+        return false;                                                                                                  \
     }
             LLM_FUNCTIONS_LIST(DECLARE_AND_LOAD)
 #undef DECLARE_AND_LOAD
-            if (is_gpu_library && !LLMService_Supports_GPU()) continue;
+            if (is_gpu_library && !LLMService_Supports_GPU())
+                continue;
 
             LLMService_Registry(&LLMProviderRegistry::instance());
             LLMService_InjectErrorState(&ErrorStateRegistry::get_error_state());
             llm = (LLMProvider *)LLMService_From_Command(command.c_str());
             if (llm == nullptr || get_status_code() != 0)
             {
-                std::cerr << "Failed to construct LLM (error: " << get_status_code() << "): " << get_status_message() << std::endl;
+                std::cerr << "Failed to construct LLM (error: " << get_status_code() << "): " << get_status_message()
+                          << std::endl;
                 if (handle)
                 {
                     unload_library(handle);
@@ -303,11 +312,12 @@ bool LLMService::create_LLM_library(const std::string &command)
 {
     std::vector<std::string> archs_cpu = available_architectures(false);
     std::vector<std::string> archs_gpu;
-    if (has_gpu_layers(command)) archs_gpu = available_architectures(true);
+    if (has_gpu_layers(command))
+        archs_gpu = available_architectures(true);
 
-    for (bool is_gpu_library: {true, false})
+    for (bool is_gpu_library : {true, false})
     {
-        std::vector<std::string> archs = is_gpu_library? archs_gpu: archs_cpu;
+        std::vector<std::string> archs = is_gpu_library ? archs_gpu : archs_cpu;
         for (const auto &llm_lib_filename : archs)
         {
             fail("", 0);
@@ -330,10 +340,13 @@ LLMService::LLMService()
     search_paths = get_search_directories();
 }
 
-LLMService::LLMService(const std::string &model_path, int num_slots, int num_threads, int num_GPU_layers, bool flash_attention, int context_size, int batch_size, bool embedding_only, const std::vector<std::string> &lora_paths)
+LLMService::LLMService(const std::string &model_path, int num_slots, int num_threads, int num_GPU_layers,
+                       bool flash_attention, int context_size, int batch_size, bool embedding_only,
+                       const std::vector<std::string> &lora_paths)
     : LLMService()
 {
-    std::string command = LLM::LLM_args_to_command(model_path, num_slots, num_threads, num_GPU_layers, flash_attention, context_size, batch_size, embedding_only, lora_paths);
+    std::string command = LLM::LLM_args_to_command(model_path, num_slots, num_threads, num_GPU_layers, flash_attention,
+                                                   context_size, batch_size, embedding_only, lora_paths);
     create_LLM_library(command);
 }
 

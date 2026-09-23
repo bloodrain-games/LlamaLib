@@ -6,18 +6,18 @@
 
 #pragma once
 
-#include <fstream>
-#include <sstream>
-#include <vector>
-#include <iostream>
-#include <setjmp.h>
-#include <type_traits>
 #include <algorithm>
 #include <cstdlib>
+#include <fstream>
+#include <iostream>
+#include <setjmp.h>
+#include <sstream>
+#include <type_traits>
+#include <vector>
 
+#include "LLM.h"
 #include "defs.h"
 #include "error_handling.h"
-#include "LLM.h"
 
 #if defined(_WIN32) || defined(__linux__)
 #include "archchecker.h"
@@ -25,16 +25,16 @@
 
 // Platform-specific library loading definitions
 #if defined(_WIN32)
-#include <windows.h>
 #include <libloaderapi.h>
+#include <windows.h>
 using LibHandle = HMODULE;                                 ///< Windows library handle type
 #define LOAD_LIB(path) LoadLibraryA(path)                  ///< Load library macro for Windows
 #define GET_SYM(handle, name) GetProcAddress(handle, name) ///< Get symbol macro for Windows
 #define CLOSE_LIB(handle) FreeLibrary(handle)              ///< Close library macro for Windows
 #else
 #include <dlfcn.h>
-#include <unistd.h>
 #include <limits.h>
+#include <unistd.h>
 #ifdef __APPLE__
 #include <mach-o/dyld.h>
 #endif
@@ -50,11 +50,11 @@ using LibHandle = void *; ///< Unix library handle type
 /// @brief Macro defining the list of dynamically loaded LLM functions
 /// @param M Macro to apply to each function signature
 /// @details This macro is used to generate function pointer declarations and loading code
-#define LLM_FUNCTIONS_LIST(M)                                                                                     \
-    M(LLMService_Registry, void, LLMProviderRegistry *)                                                           \
-    M(LLMService_InjectErrorState, void, ErrorState *)                                                            \
-    M(LLMService_Supports_GPU, bool)                                                                              \
-    M(LLMService_Construct, LLMProvider *, const char *, int, int, int, bool, int, int, bool, int, const char **) \
+#define LLM_FUNCTIONS_LIST(M)                                                                                          \
+    M(LLMService_Registry, void, LLMProviderRegistry *)                                                                \
+    M(LLMService_InjectErrorState, void, ErrorState *)                                                                 \
+    M(LLMService_Supports_GPU, bool)                                                                                   \
+    M(LLMService_Construct, LLMProvider *, const char *, int, int, int, bool, int, int, bool, int, const char **)      \
     M(LLMService_From_Command, LLMProvider *, const char *)
 
 /// @brief Runtime loader for LLM libraries
@@ -62,7 +62,7 @@ using LibHandle = void *; ///< Unix library handle type
 /// allowing for flexible deployment and architecture-specific optimizations
 class UNDREAMAI_API LLMService : public LLMProvider
 {
-public:
+  public:
     /// @brief Default constructor
     /// @details Creates an uninitialized runtime that must load a library before use
     LLMService();
@@ -78,7 +78,9 @@ public:
     /// @param embedding_only Whether to run in embedding-only mode
     /// @param lora_paths Vector of paths to LoRA adapter files
     /// @details Creates and initializes a runtime with the specified parameters
-    LLMService(const std::string &model_path, int num_slots = 1, int num_threads = -1, int num_GPU_layers = 0, bool flash_attention = false, int context_size = 4096, int batch_size = 2048, bool embedding_only = false, const std::vector<std::string> &lora_paths = {});
+    LLMService(const std::string &model_path, int num_slots = 1, int num_threads = -1, int num_GPU_layers = 0,
+               bool flash_attention = false, int context_size = 4096, int batch_size = 2048,
+               bool embedding_only = false, const std::vector<std::string> &lora_paths = {});
 
     /// @brief Destructor
     ~LLMService();
@@ -129,13 +131,19 @@ public:
     /// @param callback Optional streaming callback
     /// @param callbackWithJSON Whether callback uses JSON
     /// @return Generated completion
-    std::string completion_json(const json &data, CharArrayFn callback = nullptr, bool callbackWithJSON = true) override { return ((LLMProvider *)llm)->completion_json(data, callback, callbackWithJSON); }
+    std::string completion_json(const json &data, CharArrayFn callback = nullptr, bool callbackWithJSON = true) override
+    {
+        return ((LLMProvider *)llm)->completion_json(data, callback, callbackWithJSON);
+    }
 
     /// @brief Apply a chat template to message data
     /// @param data JSON object containing messages to format
     /// @return Formatted string with template applied
     /// @details Pure virtual method for applying chat templates to conversation data
-    std::string apply_template_json(const json &data) override { return ((LLMProvider *)llm)->apply_template_json(data); }
+    std::string apply_template_json(const json &data) override
+    {
+        return ((LLMProvider *)llm)->apply_template_json(data);
+    }
 
     /// @brief Cancel request (override - delegates to loaded library)
     /// @param data JSON cancellation request
@@ -161,7 +169,10 @@ public:
     /// @param host Host address (default: "0.0.0.0")
     /// @param port Port number (0 for auto)
     /// @param API_key Optional API key
-    void start_server(const std::string &host = "0.0.0.0", int port = -1, const std::string &API_key = "") override { ((LLMProvider *)llm)->start_server(host, port, API_key); }
+    void start_server(const std::string &host = "0.0.0.0", int port = -1, const std::string &API_key = "") override
+    {
+        ((LLMProvider *)llm)->start_server(host, port, API_key);
+    }
 
     /// @brief Stop HTTP server (override - delegates to loaded library)
     void stop_server() override { ((LLMProvider *)llm)->stop_server(); }
@@ -174,10 +185,7 @@ public:
     bool started() override { return ((LLMProvider *)llm)->started(); }
 
     /// @brief Stop service (override - delegates to loaded library)
-    void stop() override
-    {
-        ((LLMProvider *)llm)->stop();
-    }
+    void stop() override { ((LLMProvider *)llm)->stop(); }
 
     /// @brief Wait for service completion (override - delegates to loaded library)
     void join_service() override { ((LLMProvider *)llm)->join_service(); }
@@ -215,12 +223,11 @@ public:
 
     /// @brief Declare function pointers for dynamically loaded functions
     /// @details Uses the LLM_FUNCTIONS_LIST macro to declare all required function pointers
-#define DECLARE_FN(name, ret, ...) \
-    ret (*name)(__VA_ARGS__) = nullptr;
+#define DECLARE_FN(name, ret, ...) ret (*name)(__VA_ARGS__) = nullptr;
     LLM_FUNCTIONS_LIST(DECLARE_FN)
 #undef DECLARE_FN
 
-protected:
+  protected:
     std::vector<std::string> search_paths; ///< Library search paths
 
     /// @brief Load LLM library backend
@@ -228,7 +235,8 @@ protected:
     /// @param llm_lib_filename Specific library filename to load
     /// @return true if library loaded successfully, false otherwise
     /// @details Internal method for loading specific library files
-    bool create_LLM_library_backend(const std::string &command, const std::string &llm_lib_filename, bool is_gpu_library=false);
+    bool create_LLM_library_backend(const std::string &command, const std::string &llm_lib_filename,
+                                    bool is_gpu_library = false);
 };
 
 /// @brief Get OS-specific library directory

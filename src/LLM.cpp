@@ -27,12 +27,14 @@ void ensure_error_handlers_initialized()
     if (!LLMProviderRegistry::initialised)
     {
         static std::once_flag initialized;
-        std::call_once(initialized, [](){
-            set_error_handlers();
+        std::call_once(initialized,
+                       []()
+                       {
+                           set_error_handlers();
 #if !(TARGET_OS_IOS || TARGET_OS_VISION)
-            register_sigint_hook(llm_sigint_signal_handler);
+                           register_sigint_hook(llm_sigint_signal_handler);
 #endif
-        });
+                       });
     }
 }
 
@@ -43,13 +45,13 @@ LLMProvider::~LLMProvider() {}
 
 //=========================== Helpers ===========================//
 
-std::string LLM::LLM_args_to_command(const std::string &model_path, int num_slots, int num_threads, int num_GPU_layers, bool flash_attention, int context_size, int batch_size, bool embedding_only, const std::vector<std::string> &lora_paths)
+std::string LLM::LLM_args_to_command(const std::string &model_path, int num_slots, int num_threads, int num_GPU_layers,
+                                     bool flash_attention, int context_size, int batch_size, bool embedding_only,
+                                     const std::vector<std::string> &lora_paths)
 {
-    std::string command =  "-m \"" + model_path + "\"" +
-                          " -t " + std::to_string(num_threads) +
-                          " -np " + std::to_string(num_slots) +
-                          " -c " + std::to_string(context_size) +
-                          " -b " + std::to_string(batch_size);
+    std::string command = "-m \"" + model_path + "\"" + " -t " + std::to_string(num_threads) + " -np " +
+                          std::to_string(num_slots) + " -c " + std::to_string(context_size) + " -b " +
+                          std::to_string(batch_size);
 
     if (num_GPU_layers > 0)
         command += " -ngl " + std::to_string(num_GPU_layers);
@@ -173,7 +175,6 @@ std::vector<int> LLM::tokenize(const std::string &input)
     return parse_tokenize_json(json::parse(tokenize_json(build_tokenize_json(input))));
 }
 
-
 //=========================== Detokenize ===========================//
 
 json LLM::build_detokenize_json(const std::vector<int32_t> &tokens)
@@ -213,11 +214,13 @@ std::vector<float> LLM::parse_embeddings_json(const json &result)
 {
     try
     {
-        const json& emb = result.at(0).at("embedding");
+        const json &emb = result.at(0).at("embedding");
         if (emb.is_array() && !emb.empty())
         {
-            if (emb[0].is_number()) return emb.get<std::vector<float>>();
-            if (emb[0].is_array()) return emb.at(0).get<std::vector<float>>();
+            if (emb[0].is_number())
+                return emb.get<std::vector<float>>();
+            if (emb[0].is_array())
+                return emb.at(0).get<std::vector<float>>();
         }
     }
     catch (const std::exception &)
@@ -266,7 +269,8 @@ std::string LLM::parse_completion_json(const json &result)
 {
     try
     {
-        if (result.contains("error")) {
+        if (result.contains("error"))
+        {
             json error = result.at("error");
             int code = error.at("code").get<int>();
             std::string message = error.at("message").get<std::string>();
@@ -283,10 +287,7 @@ std::string LLM::parse_completion_json(const json &result)
 
 std::string LLM::completion(const std::string &prompt, CharArrayFn callback, int id_slot, bool return_response_json)
 {
-    std::string response = completion_json(
-        build_completion_json(prompt, id_slot),
-        callback,
-        false);
+    std::string response = completion_json(build_completion_json(prompt, id_slot), callback, false);
     if (return_response_json)
         return response;
     return parse_completion_json(json::parse(response));
@@ -334,8 +335,7 @@ json LLMProvider::build_lora_weight_json(const std::vector<LoraIdScale> &loras)
     json j = json::array();
     for (const auto &lora : loras)
     {
-        j.push_back({{"id", lora.id},
-                     {"scale", lora.scale}});
+        j.push_back({{"id", lora.id}, {"scale", lora.scale}});
     }
     return j;
 }
@@ -364,9 +364,7 @@ json LLMProvider::build_lora_list_json(const std::vector<LoraIdScalePath> &loras
     json j = json::array();
     for (const auto &lora : loras)
     {
-        j.push_back({{"id", lora.id},
-                     {"scale", lora.scale},
-                     {"path", lora.path}});
+        j.push_back({{"id", lora.id}, {"scale", lora.scale}, {"path", lora.path}});
     }
     return j;
 }
@@ -378,9 +376,7 @@ std::vector<LoraIdScalePath> LLMProvider::parse_lora_list_json(const json &resul
     {
         for (const auto &lora : result)
         {
-            loras.push_back({lora["id"].get<int>(),
-                             lora["scale"].get<float>(),
-                             lora["path"].get<std::string>()});
+            loras.push_back({lora["id"].get<int>(), lora["scale"].get<float>(), lora["path"].get<std::string>()});
         }
     }
     catch (const std::exception &)
@@ -534,8 +530,7 @@ const char *LLM_Lora_List(LLMProvider *llm)
     json j = json::array();
     for (const auto &lora : loras)
     {
-        j.push_back({{"id", lora.id},
-                     {"scale", lora.scale}});
+        j.push_back({{"id", lora.id}, {"scale", lora.scale}});
     }
     return stringToCharArray(j.dump());
 }
@@ -602,4 +597,12 @@ const char *LLM_Status_Message()
 const int LLM_Embedding_Size(LLMProvider *llm)
 {
     return llm->embedding_size();
+}
+
+void CharArray_Delete(char *str)
+{
+    if (str != nullptr)
+    {
+        delete[] str;
+    }
 }

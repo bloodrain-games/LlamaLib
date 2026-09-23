@@ -1,5 +1,4 @@
 <Project Sdk="Microsoft.NET.Sdk">
-
   <!-- ===================== -->
   <!--  General properties  -->
   <!-- ===================== -->
@@ -38,19 +37,20 @@
 
     <!-- CPU -->
     <LlamaLibUseAvx512 Condition="'$(LlamaLibUseAvx512)' == ''">true</LlamaLibUseAvx512>
-    <LlamaLibUseAvx2   Condition="'$(LlamaLibUseAvx2)'   == ''">true</LlamaLibUseAvx2>
-    <LlamaLibUseAvx    Condition="'$(LlamaLibUseAvx)'    == ''">true</LlamaLibUseAvx>
-    <LlamaLibUseNoAvx  Condition="'$(LlamaLibUseNoAvx)'  == ''">true</LlamaLibUseNoAvx>
+    <LlamaLibUseAvx2 Condition="'$(LlamaLibUseAvx2)'   == ''">true</LlamaLibUseAvx2>
+    <LlamaLibUseAvx Condition="'$(LlamaLibUseAvx)'    == ''">true</LlamaLibUseAvx>
+    <LlamaLibUseNoAvx Condition="'$(LlamaLibUseNoAvx)'  == ''">true</LlamaLibUseNoAvx>
 
     <!-- GPU -->
-    <LlamaLibUseCublas   Condition="'$(LlamaLibUseCublas)'   == ''">true</LlamaLibUseCublas>
+    <LlamaLibUseCublas Condition="'$(LlamaLibUseCublas)'   == ''">true</LlamaLibUseCublas>
     <LlamaLibUseTinyblas Condition="'$(LlamaLibUseTinyblas)' == ''">false</LlamaLibUseTinyblas>
-    <LlamaLibUseVulkan   Condition="'$(LlamaLibUseVulkan)'   == ''">true</LlamaLibUseVulkan>
-    <LlamaLibUseHip      Condition="'$(LlamaLibUseHip)'      == ''">true</LlamaLibUseHip>
+    <LlamaLibUseVulkan Condition="'$(LlamaLibUseVulkan)'   == ''">true</LlamaLibUseVulkan>
+    <LlamaLibUseHip Condition="'$(LlamaLibUseHip)'      == ''">true</LlamaLibUseHip>
 
     <!-- Accelerate -->
     <LlamaLibUseAccelerate Condition="'$(LlamaLibUseAccelerate)' == ''">true</LlamaLibUseAccelerate>
-    <LlamaLibUseNoAccelerate Condition="'$(LlamaLibUseNoAccelerate)' == ''">true</LlamaLibUseNoAccelerate>
+    <LlamaLibUseNoAccelerate Condition="'$(LlamaLibUseNoAccelerate)' == ''"
+      >true</LlamaLibUseNoAccelerate>
     <LlamaLibUseIOS Condition="'$(LlamaLibUseIOS)' == ''">false</LlamaLibUseIOS>
     <LlamaLibVisionOS Condition="'$(LlamaLibVisionOS)' == ''">false</LlamaLibVisionOS>
   </PropertyGroup>
@@ -77,5 +77,4 @@
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
-
 </Project>

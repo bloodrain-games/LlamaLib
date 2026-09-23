@@ -42,11 +42,12 @@ namespace UndreamAI.LlamaLib
         protected readonly object _disposeLock = new object();
         public bool disposed = false;
 
-        protected LLM() {}
+        protected LLM() { }
 
         protected LLM(LlamaLib llamaLibInstance)
         {
-            llamaLib = llamaLibInstance ?? throw new ArgumentNullException(nameof(llamaLibInstance));
+            llamaLib =
+                llamaLibInstance ?? throw new ArgumentNullException(nameof(llamaLibInstance));
         }
 
         public static void Debug(int debugLevel)
@@ -66,16 +67,28 @@ namespace UndreamAI.LlamaLib
 
         protected void CheckLlamaLib()
         {
-            if (disposed) throw new ObjectDisposedException(GetType().Name);
-            if (llamaLib == null) throw new InvalidOperationException("LlamaLib instance is not initialized");
-            if (llm == IntPtr.Zero) throw new InvalidOperationException("LLM instance is not initialized");
+            if (disposed)
+                throw new ObjectDisposedException(GetType().Name);
+            if (llamaLib == null)
+                throw new InvalidOperationException("LlamaLib instance is not initialized");
+            if (llm == IntPtr.Zero)
+                throw new InvalidOperationException("LLM instance is not initialized");
         }
 
-        public virtual void Dispose() {}
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            disposed = true;
+        }
 
         ~LLM()
         {
-            Dispose();
+            Dispose(false);
         }
 
         public string ApplyTemplate(JArray messages = null)
@@ -84,7 +97,7 @@ namespace UndreamAI.LlamaLib
                 throw new ArgumentNullException(nameof(messages));
             CheckLlamaLib();
             IntPtr result = llamaLib.LLM_Apply_Template(llm, messages.ToString() ?? string.Empty);
-            return Marshal.PtrToStringAnsi(result) ?? string.Empty;
+            return llamaLib.PtrToStringAndFree(result);
         }
 
         public List<int> Tokenize(string content)
@@ -94,14 +107,14 @@ namespace UndreamAI.LlamaLib
 
             CheckLlamaLib();
             IntPtr result = llamaLib.LLM_Tokenize(llm, content ?? string.Empty);
-            string resultStr = Marshal.PtrToStringAnsi(result) ?? string.Empty;
+            string resultStr = llamaLib.PtrToStringAndFree(result);
             List<int> ret = new List<int>();
             try
             {
                 JArray json = JArray.Parse(resultStr);
                 ret = json?.ToObject<List<int>>();
             }
-            catch {}
+            catch { }
             return ret;
         }
 
@@ -113,7 +126,7 @@ namespace UndreamAI.LlamaLib
             CheckLlamaLib();
             JArray tokensJSON = JArray.FromObject(tokens);
             IntPtr result = llamaLib.LLM_Detokenize(llm, tokensJSON.ToString() ?? string.Empty);
-            return Marshal.PtrToStringAnsi(result) ?? string.Empty;
+            return llamaLib.PtrToStringAndFree(result);
         }
 
         public string Detokenize(int[] tokens)
@@ -131,7 +144,7 @@ namespace UndreamAI.LlamaLib
             CheckLlamaLib();
 
             IntPtr result = llamaLib.LLM_Embeddings(llm, content ?? string.Empty);
-            string resultStr = Marshal.PtrToStringAnsi(result) ?? string.Empty;
+            string resultStr = llamaLib.PtrToStringAndFree(result);
 
             List<float> ret = new List<float>();
             try
@@ -139,7 +152,7 @@ namespace UndreamAI.LlamaLib
                 JArray json = JArray.Parse(resultStr);
                 ret = json?.ToObject<List<float>>();
             }
-            catch {}
+            catch { }
             return ret;
         }
 
@@ -154,12 +167,14 @@ namespace UndreamAI.LlamaLib
             CheckLlamaLib();
             JObject parameters = new JObject();
             IntPtr result = llamaLib.LLM_Get_Completion_Parameters(llm);
-            string parametersString = Marshal.PtrToStringAnsi(result) ?? "{}";
+            string parametersString = llamaLib.PtrToStringAndFree(result);
+            if (string.IsNullOrEmpty(parametersString))
+                parametersString = "{}";
             try
             {
                 parameters = JObject.Parse(parametersString);
             }
-            catch {}
+            catch { }
             return parameters;
         }
 
@@ -173,7 +188,7 @@ namespace UndreamAI.LlamaLib
         {
             CheckLlamaLib();
             IntPtr result = llamaLib.LLM_Get_Grammar(llm);
-            return Marshal.PtrToStringAnsi(result) ?? "";
+            return llamaLib.PtrToStringAndFree(result);
         }
 
         public void CheckCompletionInternal(string prompt)
@@ -183,64 +198,219 @@ namespace UndreamAI.LlamaLib
             CheckLlamaLib();
         }
 
-        public string CompletionInternal(string prompt, LlamaLib.CharArrayCallback callback, int idSlot)
+        public string CompletionInternal(
+            string prompt,
+            LlamaLib.CharArrayCallback callback,
+            int idSlot
+        )
         {
-            IntPtr result;
-            result = llamaLib.LLM_Completion(llm, prompt ?? string.Empty, callback, idSlot);
-            return Marshal.PtrToStringAnsi(result) ?? string.Empty;
+            IntPtr result = llamaLib.LLM_Completion(llm, prompt ?? string.Empty, callback, idSlot);
+            return llamaLib.PtrToStringAndFree(result);
         }
 
-        public string Completion(string prompt, LlamaLib.CharArrayCallback callback = null, int idSlot = -1)
+        public string Completion(
+            string prompt,
+            LlamaLib.CharArrayCallback callback = null,
+            int idSlot = -1
+        )
         {
             CheckCompletionInternal(prompt);
             return CompletionInternal(prompt, callback, idSlot);
         }
 
-        public async Task<string> CompletionAsync(string prompt, LlamaLib.CharArrayCallback callback = null, int idSlot = -1)
+        public async Task<string> CompletionAsync(
+            string prompt,
+            LlamaLib.CharArrayCallback callback = null,
+            int idSlot = -1,
+            System.Threading.CancellationToken cancellationToken = default
+        )
         {
             CheckCompletionInternal(prompt);
-            return await Task.Run(() => CompletionInternal(prompt, callback, idSlot));
+            if (cancellationToken.IsCancellationRequested)
+                throw new OperationCanceledException(cancellationToken);
+
+            using (
+                cancellationToken.Register(() =>
+                {
+                    try
+                    {
+                        if (this is LLMLocal local)
+                            local.Cancel(idSlot < 0 ? 0 : idSlot);
+                    }
+                    catch { }
+                })
+            )
+            {
+                string result = await Task.Run(
+                        () => CompletionInternal(prompt, callback, idSlot),
+                        cancellationToken
+                    )
+                    .ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
+                return result;
+            }
+        }
+
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_0_OR_GREATER
+        public async IAsyncEnumerable<string> CompletionStreamAsync(
+            string prompt,
+            int idSlot = -1,
+            [System.Runtime.CompilerServices.EnumeratorCancellation]
+                System.Threading.CancellationToken cancellationToken = default
+        )
+        {
+            CheckCompletionInternal(prompt);
+            var channel = System.Threading.Channels.Channel.CreateUnbounded<string>(
+                new System.Threading.Channels.UnboundedChannelOptions
+                {
+                    SingleWriter = true,
+                    SingleReader = true,
+                }
+            );
+
+            LlamaLib.CharArrayCallback callback = (text) =>
+            {
+                channel.Writer.TryWrite(text);
+            };
+
+            var completionTask = Task.Run(
+                () =>
+                {
+                    try
+                    {
+                        using (
+                            cancellationToken.Register(() =>
+                            {
+                                try
+                                {
+                                    if (this is LLMLocal local)
+                                        local.Cancel(idSlot < 0 ? 0 : idSlot);
+                                }
+                                catch { }
+                            })
+                        )
+                        {
+                            CompletionInternal(prompt, callback, idSlot);
+                        }
+                    }
+                    finally
+                    {
+                        channel.Writer.Complete();
+                    }
+                },
+                cancellationToken
+            );
+
+            while (await channel.Reader.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                while (channel.Reader.TryRead(out var chunk))
+                {
+                    yield return chunk;
+                }
+            }
+
+            await completionTask.ConfigureAwait(false);
+        }
+#endif
+
+        public async Task<List<int>> TokenizeAsync(
+            string content,
+            System.Threading.CancellationToken cancellationToken = default
+        )
+        {
+            return await Task.Run(() => Tokenize(content), cancellationToken).ConfigureAwait(false);
+        }
+
+        public async Task<string> DetokenizeAsync(
+            List<int> tokens,
+            System.Threading.CancellationToken cancellationToken = default
+        )
+        {
+            return await Task.Run(() => Detokenize(tokens), cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        public async Task<List<float>> EmbeddingsAsync(
+            string content,
+            System.Threading.CancellationToken cancellationToken = default
+        )
+        {
+            return await Task.Run(() => Embeddings(content), cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        public async Task<string> ApplyTemplateAsync(
+            JArray messages,
+            System.Threading.CancellationToken cancellationToken = default
+        )
+        {
+            return await Task.Run(() => ApplyTemplate(messages), cancellationToken)
+                .ConfigureAwait(false);
         }
     }
 
     // LLMLocal class
     public abstract class LLMLocal : LLM
     {
-        protected LLMLocal() : base() {}
+        protected LLMLocal()
+            : base() { }
 
-        protected LLMLocal(LlamaLib llamaLibInstance) : base(llamaLibInstance) {}
+        protected LLMLocal(LlamaLib llamaLibInstance)
+            : base(llamaLibInstance) { }
 
-        public string SaveSlot(int idSlot, string filepath)
+        public virtual string SaveSlot(int idSlot, string filepath)
         {
             if (string.IsNullOrEmpty(filepath))
                 throw new ArgumentNullException(nameof(filepath));
 
             IntPtr result = llamaLib.LLM_Save_Slot(llm, idSlot, filepath ?? string.Empty);
-            return Marshal.PtrToStringAnsi(result) ?? string.Empty;
+            return llamaLib.PtrToStringAndFree(result);
         }
 
-        public string LoadSlot(int idSlot, string filepath)
+        public virtual string LoadSlot(int idSlot, string filepath)
         {
             if (string.IsNullOrEmpty(filepath) || !File.Exists(filepath))
                 throw new ArgumentNullException(nameof(filepath));
 
             IntPtr result = llamaLib.LLM_Load_Slot(llm, idSlot, filepath ?? string.Empty);
-            return Marshal.PtrToStringAnsi(result) ?? string.Empty;
+            return llamaLib.PtrToStringAndFree(result);
         }
 
-        public void Cancel(int idSlot)
+        public virtual void Cancel(int idSlot)
         {
             CheckLlamaLib();
             llamaLib.LLM_Cancel(llm, idSlot);
+        }
+
+        public async Task<string> SaveSlotAsync(
+            int idSlot,
+            string filepath,
+            System.Threading.CancellationToken cancellationToken = default
+        )
+        {
+            return await Task.Run(() => SaveSlot(idSlot, filepath), cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        public async Task<string> LoadSlotAsync(
+            int idSlot,
+            string filepath,
+            System.Threading.CancellationToken cancellationToken = default
+        )
+        {
+            return await Task.Run(() => LoadSlot(idSlot, filepath), cancellationToken)
+                .ConfigureAwait(false);
         }
     }
 
     // LLMProvider class
     public abstract class LLMProvider : LLMLocal
     {
-        protected LLMProvider() : base() {}
+        protected LLMProvider()
+            : base() { }
 
-        protected LLMProvider(LlamaLib llamaLibInstance) : base(llamaLibInstance) {}
+        protected LLMProvider(LlamaLib llamaLibInstance)
+            : base(llamaLibInstance) { }
 
         public void EnableReasoning(bool enableReasoning)
         {
@@ -283,15 +453,18 @@ namespace UndreamAI.LlamaLib
                 foreach (var item in jsonArray)
                 {
                     int id = item["id"]?.ToObject<int>() ?? -1;
-                    if (id < 0) continue;
-                    loras.Add(new LoraIdScalePath(
-                        id,
-                        item["scale"]?.ToObject<float>() ?? 0.0f,
-                        item["path"]?.ToString() ?? string.Empty
-                    ));
+                    if (id < 0)
+                        continue;
+                    loras.Add(
+                        new LoraIdScalePath(
+                            id,
+                            item["scale"]?.ToObject<float>() ?? 0.0f,
+                            item["path"]?.ToString() ?? string.Empty
+                        )
+                    );
                 }
             }
-            catch {}
+            catch { }
             return loras;
         }
 
@@ -299,7 +472,7 @@ namespace UndreamAI.LlamaLib
         {
             CheckLlamaLib();
             var result = llamaLib.LLM_Lora_List(llm);
-            return Marshal.PtrToStringAnsi(result) ?? string.Empty;
+            return llamaLib.PtrToStringAndFree(result);
         }
 
         public List<LoraIdScalePath> LoraList()
@@ -316,14 +489,20 @@ namespace UndreamAI.LlamaLib
             return llamaLib.LLM_Started(llm);
         }
 
-        public async Task<bool> StartAsync()
+        public async Task<bool> StartAsync(
+            System.Threading.CancellationToken cancellationToken = default
+        )
         {
             CheckLlamaLib();
-            return await Task.Run(() =>
-            {
-                llamaLib.LLM_Start(llm);
-                return llamaLib.LLM_Started(llm);
-            });
+            return await Task.Run(
+                    () =>
+                    {
+                        llamaLib.LLM_Start(llm);
+                        return llamaLib.LLM_Started(llm);
+                    },
+                    cancellationToken
+                )
+                .ConfigureAwait(false);
         }
 
         public bool Started()
@@ -382,7 +561,7 @@ namespace UndreamAI.LlamaLib
             return llamaLib.LLM_Embedding_Size(llm);
         }
 
-        public override void Dispose()
+        protected override void Dispose(bool disposing)
         {
             lock (_disposeLock)
             {
@@ -394,14 +573,18 @@ namespace UndreamAI.LlamaLib
                         {
                             llamaLib.LLM_Delete(llm);
                         }
-                        catch (Exception) {}
+                        catch (Exception) { }
+                        llm = IntPtr.Zero;
                     }
-                    llamaLib?.Dispose();
-                    llamaLib = null;
-                    llm = IntPtr.Zero;
+                    if (disposing)
+                    {
+                        llamaLib?.Dispose();
+                        llamaLib = null;
+                    }
+                    disposed = true;
                 }
-                disposed = true;
             }
+            base.Dispose(disposing);
         }
     }
 }

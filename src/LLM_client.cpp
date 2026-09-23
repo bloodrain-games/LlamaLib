@@ -44,25 +44,30 @@ X509_STORE *load_client_cert(const std::string &cert_str)
     return cts;
 }
 #else
-struct IOSCallbackContext {
-    ResponseConcatenator* concatenator;
-    bool* cancel_flag;
+struct IOSCallbackContext
+{
+    ResponseConcatenator *concatenator;
+    bool *cancel_flag;
 };
 
 // Static callback for iOS that receives context
-static void ios_callback_with_context(const char* data, void* ctx) {
-    auto* context = static_cast<IOSCallbackContext*>(ctx);
-    
-    if (!context || !context->concatenator || !context->cancel_flag) {
+static void ios_callback_with_context(const char *data, void *ctx)
+{
+    auto *context = static_cast<IOSCallbackContext *>(ctx);
+
+    if (!context || !context->concatenator || !context->cancel_flag)
+    {
         return;
     }
-    
-    if (*context->cancel_flag) {
+
+    if (*context->cancel_flag)
+    {
         return;
     }
-    
+
     std::string chunk_str(data);
-    if (!context->concatenator->process_chunk(chunk_str)) {
+    if (!context->concatenator->process_chunk(chunk_str))
+    {
         *context->cancel_flag = true;
     }
 }
@@ -70,10 +75,12 @@ static void ios_callback_with_context(const char* data, void* ctx) {
 
 bool LLMClient::is_server_alive()
 {
-    if (!is_remote()) return true;
+    if (!is_remote())
+        return true;
 
     std::vector<std::pair<std::string, std::string>> headers;
-    if (!API_key.empty()) {
+    if (!API_key.empty())
+    {
         headers.push_back({"Authorization", "Bearer " + API_key});
     }
 
@@ -82,17 +89,15 @@ bool LLMClient::is_server_alive()
     return result.success && result.status_code >= 200 && result.status_code < 300;
 #else
     httplib::Headers Headers;
-    for (const auto& h : headers) Headers.insert(h);
+    for (const auto &h : headers)
+        Headers.insert(h);
     auto res = use_ssl ? sslClient->Post("/health", Headers) : client->Post("/health", Headers);
     return res && res->status >= 200 && res->status < 300;
 #endif
 }
 
-std::string LLMClient::post_request(
-    const std::string &path,
-    const json &payload,
-    CharArrayFn callback,
-    bool callbackWithJSON)
+std::string LLMClient::post_request(const std::string &path, const json &payload, CharArrayFn callback,
+                                    bool callbackWithJSON)
 {
     json body = payload;
     bool stream = callback != nullptr;
@@ -101,67 +106,75 @@ std::string LLMClient::post_request(
     else
         body["stream"] = stream;
 
-    bool* cancel_flag = new bool(false);
-    if (stream) active_requests.push_back(cancel_flag);
+    bool *cancel_flag = new bool(false);
+    if (stream)
+    {
+        std::lock_guard<std::mutex> lock(active_requests_mutex);
+        active_requests.push_back(cancel_flag);
+    }
 
     std::string response_buffer = "";
     ResponseConcatenator concatenator;
-    if (stream && callback) concatenator.set_callback(callback, callbackWithJSON);
+    if (stream && callback)
+        concatenator.set_callback(callback, callbackWithJSON);
 
     std::vector<std::pair<std::string, std::string>> headers = {
         {"Content-Type", "application/json"},
         {"Accept", stream ? "text/event-stream" : "application/json"},
-        {"Cache-Control", "no-cache"}
-    };
-    
-    if (!API_key.empty()) {
+        {"Cache-Control", "no-cache"}};
+
+    if (!API_key.empty())
+    {
         headers.push_back({"Authorization", "Bearer " + API_key});
     }
 
 #if TARGET_OS_IOS || TARGET_OS_VISION
     // iOS Native Implementation with context
     IOSCallbackContext ios_context = {&concatenator, cancel_flag};
-    
-    HttpResult result;
-    for (int attempt = 0; attempt <= max_retries; attempt++) {
-        result = transport->post_request(
-            path, 
-            body.dump(), 
-            headers, 
-            stream ? ios_callback_with_context : nullptr,
-            stream ? &ios_context : nullptr,
-            cancel_flag
-        );
 
-        if (result.success || *cancel_flag) break;
+    HttpResult result;
+    for (int attempt = 0; attempt <= max_retries; attempt++)
+    {
+        result = transport->post_request(path, body.dump(), headers, stream ? ios_callback_with_context : nullptr,
+                                         stream ? &ios_context : nullptr, cancel_flag);
+
+        if (result.success || *cancel_flag)
+            break;
 
         int delay_seconds = std::min(30, 1 << attempt);
-        std::cerr << "[LLMClient] POST failed: " << result.error_message
-                  << ", retrying in " << delay_seconds << "s (attempt "
-                  << attempt << "/" << max_retries << ")\n";
+        std::cerr << "[LLMClient] POST failed: " << result.error_message << ", retrying in " << delay_seconds
+                  << "s (attempt " << attempt << "/" << max_retries << ")\n";
         std::this_thread::sleep_for(std::chrono::seconds(delay_seconds));
     }
 
-    if (!result.success) {
+    if (!result.success)
+    {
         std::cerr << "[LLMClient] POST request failed: " << result.error_message << "\n";
-        if (stream) {
-            active_requests.erase(std::remove(active_requests.begin(), active_requests.end(), cancel_flag), active_requests.end());
+        if (stream)
+        {
+            std::lock_guard<std::mutex> lock(active_requests_mutex);
+            active_requests.erase(std::remove(active_requests.begin(), active_requests.end(), cancel_flag),
+                                  active_requests.end());
         }
         delete cancel_flag;
         return "{}";
     }
 
-    if (stream) {
-        active_requests.erase(std::remove(active_requests.begin(), active_requests.end(), cancel_flag), active_requests.end());
+    if (stream)
+    {
+        std::lock_guard<std::mutex> lock(active_requests_mutex);
+        active_requests.erase(std::remove(active_requests.begin(), active_requests.end(), cancel_flag),
+                              active_requests.end());
     }
     delete cancel_flag;
 
     return stream ? concatenator.get_result_json() : result.body;
-    
+
 #else
     // cpp-httplib implementation (unchanged)
     httplib::Headers Headers;
-    for (const auto& h : headers) Headers.insert(h);
+    for (const auto &h : headers)
+        Headers.insert(h);
 
     httplib::Request req;
     req.method = "POST";
@@ -174,7 +187,8 @@ std::string LLMClient::post_request(
         std::string chunk_str(data, data_length);
         if (stream)
         {
-            if (!concatenator.process_chunk(chunk_str)) {
+            if (!concatenator.process_chunk(chunk_str))
+            {
                 return false;
             }
             if (*cancel_flag)
@@ -195,11 +209,12 @@ std::string LLMClient::post_request(
     for (int attempt = 0; attempt <= max_retries; attempt++)
     {
         request_sent = use_ssl ? sslClient->send(req) : client->send(req);
-        if (request_sent || *cancel_flag) break;
+        if (request_sent || *cancel_flag)
+            break;
 
         int delay_seconds = std::min(max_delay, 1 << attempt);
-        std::cerr << "[LLMClient] POST failed, retrying in " << delay_seconds
-                  << "s (attempt " << attempt << "/" << max_retries << ")\n";
+        std::cerr << "[LLMClient] POST failed, retrying in " << delay_seconds << "s (attempt " << attempt << "/"
+                  << max_retries << ")\n";
         std::this_thread::sleep_for(std::chrono::seconds(delay_seconds));
     }
 
@@ -209,12 +224,20 @@ std::string LLMClient::post_request(
         return "{}";
     }
 
-    if (stream) active_requests.erase(std::remove(active_requests.begin(), active_requests.end(), cancel_flag), active_requests.end());
+    if (stream)
+    {
+        std::lock_guard<std::mutex> lock(active_requests_mutex);
+        active_requests.erase(std::remove(active_requests.begin(), active_requests.end(), cancel_flag),
+                              active_requests.end());
+    }
     delete cancel_flag;
 
-    if (stream) {
+    if (stream)
+    {
         return concatenator.get_result_json();
-    } else {
+    }
+    else
+    {
         return response_buffer;
     }
 #endif
@@ -226,7 +249,8 @@ std::string LLMClient::post_request(
 LLMClient::LLMClient(LLMProvider *llm_) : llm(llm_) {}
 
 // Constructor for remote LLM
-LLMClient::LLMClient(const std::string &url_, const int port_, const std::string &API_key_, const int max_retries_) : url(url_), port(port_), API_key(API_key_), max_retries(max_retries_)
+LLMClient::LLMClient(const std::string &url_, const int port_, const std::string &API_key_, const int max_retries_)
+    : url(url_), port(port_), API_key(API_key_), max_retries(max_retries_)
 {
     std::string host;
     if (url.rfind("https://", 0) == 0)
@@ -258,15 +282,32 @@ LLMClient::LLMClient(const std::string &url_, const int port_, const std::string
 LLMClient::~LLMClient()
 {
 #if TARGET_OS_IOS || TARGET_OS_VISION
-    if (transport != nullptr) {
+    if (transport != nullptr)
+    {
         delete transport;
+        transport = nullptr;
     }
 #else
     if (client != nullptr)
+    {
         delete client;
+        client = nullptr;
+    }
     if (sslClient != nullptr)
+    {
         delete sslClient;
+        sslClient = nullptr;
+    }
 #endif
+    {
+        std::lock_guard<std::mutex> lock(active_requests_mutex);
+        for (bool *flag : active_requests)
+        {
+            if (flag != nullptr)
+                delete flag;
+        }
+        active_requests.clear();
+    }
 }
 
 void LLMClient::set_SSL(const char *SSL_cert_)
@@ -352,7 +393,10 @@ int LLMClient::get_slot_context_size()
             json data = json::parse(res);
             return data.at("default_generation_settings").at("n_ctx").get<int>();
         }
-        catch (const std::exception & ex) {std::cerr<<ex.what()<<std::endl;}
+        catch (const std::exception &ex)
+        {
+            std::cerr << ex.what() << std::endl;
+        }
         return -1;
     }
     else
@@ -390,11 +434,17 @@ void LLMClient::cancel(int id_slot)
 {
     if (is_remote())
     {
-        for (bool* flag : active_requests) *flag = true;
+        std::lock_guard<std::mutex> lock(active_requests_mutex);
+        for (bool *flag : active_requests)
+        {
+            if (flag != nullptr)
+                *flag = true;
+        }
     }
     else
     {
-        llm->cancel(id_slot);
+        if (llm != nullptr)
+            llm->cancel(id_slot);
     }
 }
 
@@ -418,4 +468,12 @@ LLMClient *LLMClient_Construct(LLMProvider *llm)
 LLMClient *LLMClient_Construct_Remote(const char *url, const int port, const char *API_key)
 {
     return new LLMClient(url, port, API_key);
+}
+
+void LLMClient_Delete(LLMClient *llm)
+{
+    if (llm != nullptr)
+    {
+        delete llm;
+    }
 }

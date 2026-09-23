@@ -2,39 +2,41 @@
 #include "LlamaLib.h"
 
 #ifndef _WIN32
-#include <unistd.h>
 #include <limits.h>
+#include <unistd.h>
 #endif
 
-#include <iostream>
-#include <fstream>
-#include <thread>
 #include <chrono>
+#include <fstream>
+#include <iostream>
+#include <thread>
 #include <unordered_set>
 
-std::string PROMPT = "<|im_start|>system\nyou are an artificial intelligence assistant<|im_end|>\n<|im_start|>user\nHello, how are you?<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n";
+std::string PROMPT =
+    "<|im_start|>system\nyou are an artificial intelligence assistant<|im_end|>\n<|im_start|>user\nHello, how are "
+    "you?<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n";
 std::string REPLY = "Hello! I'm here to help you with anything! How can I assist you today?";
 int ID_SLOT = 0;
 int EMBEDDING_SIZE;
 
-#define ASSERT(cond)                                           \
-    do                                                         \
-    {                                                          \
-        if (!(cond))                                           \
-        {                                                      \
-            std::cerr << "Assertion failed: " << #cond << "\n" \
-                      << "File: " << __FILE__ << "\n"          \
-                      << "Line: " << __LINE__ << std::endl;    \
-            std::abort();                                      \
-        }                                                      \
+#define ASSERT(cond)                                                                                                   \
+    do                                                                                                                 \
+    {                                                                                                                  \
+        if (!(cond))                                                                                                   \
+        {                                                                                                              \
+            std::cerr << "Assertion failed: " << #cond << "\n"                                                         \
+                      << "File: " << __FILE__ << "\n"                                                                  \
+                      << "Line: " << __LINE__ << std::endl;                                                            \
+            std::abort();                                                                                              \
+        }                                                                                                              \
     } while (false)
 
 // Trim from the start (left trim)
 std::string ltrim(const std::string &s)
 {
     std::string result = s;
-    result.erase(result.begin(), std::find_if(result.begin(), result.end(), [](unsigned char ch)
-                                              { return !std::isspace(ch); }));
+    result.erase(result.begin(),
+                 std::find_if(result.begin(), result.end(), [](unsigned char ch) { return !std::isspace(ch); }));
     return result;
 }
 
@@ -42,10 +44,9 @@ std::string ltrim(const std::string &s)
 std::string rtrim(const std::string &s)
 {
     std::string result = s;
-    result.erase(std::find_if(result.rbegin(), result.rend(), [](unsigned char ch)
-                              { return !std::isspace(ch); })
-                     .base(),
-                 result.end());
+    result.erase(
+        std::find_if(result.rbegin(), result.rend(), [](unsigned char ch) { return !std::isspace(ch); }).base(),
+        result.end());
     return result;
 }
 
@@ -55,19 +56,25 @@ std::string trim(const std::string &s)
     return ltrim(rtrim(s));
 }
 
-static std::vector<std::string> split_words(const std::string &s) {
+static std::vector<std::string> split_words(const std::string &s)
+{
     const std::string delims = " ,.!?\n\t\r";
 
     std::vector<std::string> words;
     std::string word;
 
-    for (char c : s) {
-        if (delims.find(c) != std::string::npos) {
-            if (!word.empty()) {
+    for (char c : s)
+    {
+        if (delims.find(c) != std::string::npos)
+        {
+            if (!word.empty())
+            {
                 words.push_back(word);
                 word.clear();
             }
-        } else {
+        }
+        else
+        {
             word += c;
         }
     }
@@ -78,14 +85,16 @@ static std::vector<std::string> split_words(const std::string &s) {
     return words;
 }
 
-void test_completion_reply(const std::string &reply, const std::string &replyGT, float threshold=0.7) {
+void test_completion_reply(const std::string &reply, const std::string &replyGT, float threshold = 0.7)
+{
     auto words1 = split_words(reply);
     auto words2 = split_words(replyGT);
 
     std::unordered_set<std::string> set2(words2.begin(), words2.end());
 
     int commonWords = 0;
-    for (const auto &w : words1) {
+    for (const auto &w : words1)
+    {
         if (set2.count(w))
             commonWords++;
     }
@@ -95,12 +104,11 @@ void test_completion_reply(const std::string &reply, const std::string &replyGT,
     double ratio = totalWords > 0 ? static_cast<double>(commonWords) / totalWords : 1.0;
     if (ratio < threshold)
     {
-        std::cout<<"--------- prediction ---------\n"<<reply<<std::endl;
-        std::cout<<"--------- ground truth ---------\n"<<replyGT<<std::endl;
+        std::cout << "--------- prediction ---------\n" << reply << std::endl;
+        std::cout << "--------- ground truth ---------\n" << replyGT << std::endl;
     }
     ASSERT(ratio >= threshold);
 }
-
 
 int counter = 0;
 std::string concat_result = "";
@@ -108,7 +116,8 @@ void count_calls(const char *c)
 {
     counter++;
     std::string msg(c);
-    if (msg.length() == 0 || msg.length() == concat_result.length()) return;
+    if (msg.length() == 0 || msg.length() == concat_result.length())
+        return;
     ASSERT(concat_result.length() < msg.length());
     ASSERT(concat_result == msg.substr(0, concat_result.length()));
     concat_result = c;
@@ -338,7 +347,8 @@ void test_agent_chat(LLMAgent *agent, bool stream, bool use_api)
         {
             if (stream)
             {
-                reply = LLMAgent_Chat(agent, user_prompt.c_str(), add_to_history, static_cast<CharArrayFn>(count_calls));
+                reply =
+                    LLMAgent_Chat(agent, user_prompt.c_str(), add_to_history, static_cast<CharArrayFn>(count_calls));
             }
             else
             {
@@ -548,13 +558,11 @@ void test_ChatMessage()
 
 class TestLLM : public LLMProvider
 {
-public:
+  public:
     std::vector<int> TOKENS = std::vector<int>{1, 2, 3};
     std::string CONTENT = "my message";
     std::vector<float> EMBEDDING = std::vector<float>{0.1f, 0.2f, 0.3f};
-    std::vector<LoraIdScalePath> LORAS = {
-        {1, 1.0f, "model1.lora"},
-        {2, 0.5f, "model2.lora"}};
+    std::vector<LoraIdScalePath> LORAS = {{1, 1.0f, "model1.lora"}, {2, 0.5f, "model2.lora"}};
     std::string SAVE_PATH = "test.save";
     int cancelled_slot = -1;
     std::string chat_template = "";
@@ -574,19 +582,22 @@ public:
     void debug(int debug_level) override {}
     void logging_callback(CharArrayFn callback) override {}
 
-    std::string tokenize_json(const json &data) override {
+    std::string tokenize_json(const json &data) override
+    {
         json result;
         result["tokens"] = TOKENS;
         return result.dump();
     }
 
-    std::string detokenize_json(const json &data) override {
+    std::string detokenize_json(const json &data) override
+    {
         json result;
         result["content"] = CONTENT;
         return result.dump();
     }
 
-    std::string embeddings_json(const json &data) override {
+    std::string embeddings_json(const json &data) override
+    {
         json result = json::array();
         result.push_back({{"embedding", EMBEDDING}});
         return result.dump();
@@ -599,20 +610,19 @@ public:
         return result.dump();
     }
 
-    std::string apply_template_json(const json &data) override {
+    std::string apply_template_json(const json &data) override
+    {
         return data.at("messages")[0].at("message").get<std::string>();
     }
 
-    std::string slot_json(const json &data) override {
+    std::string slot_json(const json &data) override
+    {
         json result;
         result["filename"] = SAVE_PATH;
         return result.dump();
     }
 
-    void cancel(int id_slot) override
-    {
-        cancelled_slot = id_slot;
-    }
+    void cancel(int id_slot) override { cancelled_slot = id_slot; }
 
     std::string lora_weight_json(const json &data) override
     {
@@ -621,77 +631,47 @@ public:
         return result;
     }
 
-    std::string lora_list_json() override
-    {
-        return build_lora_list_json(LORAS);
-    }
+    std::string lora_list_json() override { return build_lora_list_json(LORAS); }
 
     std::string debug_implementation() override { return "standalone"; }
 
-    json build_apply_template_json(const json &messages) override
-    {
-        return LLM::build_apply_template_json(messages);
-    }
+    json build_apply_template_json(const json &messages) override { return LLM::build_apply_template_json(messages); }
 
     std::string parse_apply_template_json(const json &result) override
     {
         return LLM::parse_apply_template_json(result);
     }
 
-    json build_tokenize_json(const std::string &query) override
-    {
-        return LLM::build_tokenize_json(query);
-    }
+    json build_tokenize_json(const std::string &query) override { return LLM::build_tokenize_json(query); }
 
-    std::vector<int> parse_tokenize_json(const json &result) override
-    {
-        return LLM::parse_tokenize_json(result);
-    }
+    std::vector<int> parse_tokenize_json(const json &result) override { return LLM::parse_tokenize_json(result); }
 
     json build_detokenize_json(const std::vector<int32_t> &tokens) override
     {
         return LLM::build_detokenize_json(tokens);
     }
 
-    std::string parse_detokenize_json(const json &result) override
-    {
-        return LLM::parse_detokenize_json(result);
-    }
+    std::string parse_detokenize_json(const json &result) override { return LLM::parse_detokenize_json(result); }
 
-    json build_embeddings_json(const std::string &query) override
-    {
-        return LLM::build_embeddings_json(query);
-    }
+    json build_embeddings_json(const std::string &query) override { return LLM::build_embeddings_json(query); }
 
-    std::vector<float> parse_embeddings_json(const json &result) override
-    {
-        return LLM::parse_embeddings_json(result);
-    }
+    std::vector<float> parse_embeddings_json(const json &result) override { return LLM::parse_embeddings_json(result); }
 
     json build_completion_json(const std::string &prompt, int id_slot = -1) override
     {
         return LLM::build_completion_json(prompt, id_slot);
     }
 
-    std::string parse_completion_json(const json &result) override
-    {
-        return LLM::parse_completion_json(result);
-    }
+    std::string parse_completion_json(const json &result) override { return LLM::parse_completion_json(result); }
 
     json build_slot_json(int id_slot, const std::string &action, const std::string &filepath) override
     {
         return LLMLocal::build_slot_json(id_slot, action, filepath);
     }
 
-    std::string parse_slot_json(const json &result) override
-    {
-        return LLMLocal::parse_slot_json(result);
-    }
+    std::string parse_slot_json(const json &result) override { return LLMLocal::parse_slot_json(result); }
 
-    bool parse_lora_weight_json(const json &result) override
-    {
-        return LLMProvider::parse_lora_weight_json(result);
-    }
+    bool parse_lora_weight_json(const json &result) override { return LLMProvider::parse_lora_weight_json(result); }
 
     json build_lora_weight_json(const std::vector<LoraIdScale> &loras) override
     {
@@ -746,11 +726,7 @@ void run_mock_tests()
     {
         int id_slot = 1;
         json params = {{"temperature", 0.7}};
-        json input_json = {
-            {"prompt", llm.CONTENT},
-            {"id_slot", id_slot},
-            {"n_keep", 0},
-            {"temperature", 0.7}};
+        json input_json = {{"prompt", llm.CONTENT}, {"id_slot", id_slot}, {"n_keep", 0}, {"temperature", 0.7}};
         json output_json = {{"content", llm.CONTENT}};
 
         llm.set_completion_params(params);
@@ -764,10 +740,7 @@ void run_mock_tests()
     {
         int id_slot = 42;
         std::string action = "load";
-        json input_json = {
-            {"id_slot", id_slot},
-            {"action", action},
-            {"filepath", llm.SAVE_PATH}};
+        json input_json = {{"id_slot", id_slot}, {"action", action}, {"filepath", llm.SAVE_PATH}};
         json output_json = {{"filename", llm.SAVE_PATH}};
 
         ASSERT(llm.build_slot_json(id_slot, action, llm.SAVE_PATH) == input_json);
@@ -853,8 +826,7 @@ void run_LLMAgent_tests(LLMLocal *llm)
     std::string system_prompt = "You are a helpful AI assistant for testing purposes.";
     LLMAgent *agent = new LLMAgent(llm, system_prompt);
 
-    std::cout << std::endl
-              << "<<< LLM agent" << std::endl;
+    std::cout << std::endl << "<<< LLM agent" << std::endl;
     run_LLM_tests(agent);
 
     for (bool use_api : {true, false})
@@ -993,7 +965,8 @@ void test_API_key(LLMService *llm_service)
 {
     std::string API_key = "secret_code";
     llm_service->start_server("", 8080, API_key);
-    while (!llm_service->started()){
+    while (!llm_service->started())
+    {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
 
@@ -1014,7 +987,7 @@ void test_API_key(LLMService *llm_service)
     ASSERT(!LLMClient_Is_Server_Alive(&llm_remote_client));
 }
 
-void fill_history_with_words(LLMAgent* agent, int num_words, int num_messages)
+void fill_history_with_words(LLMAgent *agent, int num_words, int num_messages)
 {
     int num_per_message = num_words / num_messages;
 
@@ -1022,10 +995,12 @@ void fill_history_with_words(LLMAgent* agent, int num_words, int num_messages)
     std::string message = "";
     std::string message2 = "";
 
-    for (int i=0; i<num_per_message-1; i++) message += "Hello ";
-    for (int i=0; i<num_per_message-1; i++) message2 += "Hi ";
+    for (int i = 0; i < num_per_message - 1; i++)
+        message += "Hello ";
+    for (int i = 0; i < num_per_message - 1; i++)
+        message2 += "Hi ";
 
-    for (int i=0; i<num_messages/2; i++)
+    for (int i = 0; i < num_messages / 2; i++)
     {
         test_history.push_back({{"role", "user"}, {"content", message + std::to_string(i)}});
         test_history.push_back({{"role", "assistant"}, {"content", message2 + std::to_string(i)}});
@@ -1058,7 +1033,8 @@ void test_overflow(LLMService *llm_service, int n_ctx)
     std::cout << std::endl << "Overflow: Summarize" << std::endl;
     std::cout.flush();
     fill_history_with_words(agent, num_left, num_messages);
-    agent->set_overflow_strategy(ContextOverflowStrategy::Summarize, 0.5, "Summarise the provided messages and existing history");
+    agent->set_overflow_strategy(ContextOverflowStrategy::Summarize, 0.5,
+                                 "Summarise the provided messages and existing history");
     reply = agent->chat(user_prompt);
     ASSERT(agent->get_history_size() == 2);
     ASSERT(agent->get_summary() != "");
@@ -1083,22 +1059,28 @@ void run_all_tests(LLMService *llm_service, bool embedding)
     LLM_Start(llm_service);
 
     EMBEDDING_SIZE = LLM_Embedding_Size(llm_service);
-    if (embedding) run_LLM_embedding_tests(llm_service);
-    else run_LLMProvider_tests(llm_service);
+    if (embedding)
+        run_LLM_embedding_tests(llm_service);
+    else
+        run_LLMProvider_tests(llm_service);
 
     std::cout << std::endl << "-------- LLM client --------" << std::endl;
     std::cout.flush();
     LLMClient llm_client(llm_service);
-    if (embedding) run_LLM_embedding_tests(&llm_client);
-    else run_LLMLocal_tests(&llm_client);
+    if (embedding)
+        run_LLM_embedding_tests(&llm_client);
+    else
+        run_LLMLocal_tests(&llm_client);
 
     std::cout << std::endl << "-------- LLM remote client --------" << std::endl;
     std::cout.flush();
     LLMClient llm_remote_client("http://localhost", 8080);
     llm_service->start_server("", 8080);
     std::this_thread::sleep_for(std::chrono::seconds(1));
-    if (embedding) run_LLM_embedding_tests(&llm_remote_client);
-    else run_LLMLocal_tests(&llm_remote_client);
+    if (embedding)
+        run_LLM_embedding_tests(&llm_remote_client);
+    else
+        run_LLMLocal_tests(&llm_remote_client);
     llm_service->stop_server();
 
     test_API_key(llm_service);
@@ -1133,14 +1115,14 @@ int main(int argc, char **argv)
     run_mock_tests();
 
     int n_ctx = 250;
-    LLMService* llm_service_ctx = LLMServiceBuilder().model("../tests/model.gguf").contextSize(n_ctx).build();
+    LLMService *llm_service_ctx = LLMServiceBuilder().model("../tests/model.gguf").contextSize(n_ctx).build();
     run_overflow_tests(llm_service_ctx, n_ctx);
 
-    LLMService* llm_service = new LLMService("../tests/model.gguf");
+    LLMService *llm_service = new LLMService("../tests/model.gguf");
     run_all_tests(llm_service, false);
 
-    LLMService* llm_service_embedding = LLMService::from_command("-m ../tests/model_embedding.gguf --embeddings");
+    LLMService *llm_service_embedding = LLMService::from_command("-m ../tests/model_embedding.gguf --embeddings");
     run_all_tests(llm_service_embedding, true);
-     
+
     return 0;
 }

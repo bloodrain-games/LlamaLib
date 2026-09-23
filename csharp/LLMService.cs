@@ -6,10 +6,17 @@ namespace UndreamAI.LlamaLib
 {
     public class LLMService : LLMProvider
     {
-        public LLMService(string modelPath, int numSlots = 1,
-                          int numThreads = -1, int numGpuLayers = 0,
-                          bool flashAttention = false, int contextSize = 4096,
-                          int batchSize = 2048, bool embeddingOnly = false, string[] loraPaths = null)
+        public LLMService(
+            string modelPath,
+            int numSlots = 1,
+            int numThreads = -1,
+            int numGpuLayers = 0,
+            bool flashAttention = false,
+            int contextSize = 4096,
+            int batchSize = 2048,
+            bool embeddingOnly = false,
+            string[] loraPaths = null
+        )
         {
             if (string.IsNullOrEmpty(modelPath))
                 throw new ArgumentNullException(nameof(modelPath));
@@ -19,8 +26,18 @@ namespace UndreamAI.LlamaLib
             try
             {
                 llamaLib = new LlamaLib(numGpuLayers > 0);
-                llm = CreateLLM(llamaLib, modelPath, numSlots, numThreads, numGpuLayers,
-                    flashAttention, contextSize, batchSize, embeddingOnly, loraPaths);
+                llm = CreateLLM(
+                    llamaLib,
+                    modelPath,
+                    numSlots,
+                    numThreads,
+                    numGpuLayers,
+                    flashAttention,
+                    contextSize,
+                    batchSize,
+                    embeddingOnly,
+                    loraPaths
+                );
             }
             catch
             {
@@ -31,8 +48,10 @@ namespace UndreamAI.LlamaLib
 
         public LLMService(LlamaLib llamaLibInstance, IntPtr llmInstance)
         {
-            if (llamaLibInstance == null) throw new ArgumentNullException(nameof(llamaLibInstance));
-            if (llmInstance == IntPtr.Zero) throw new ArgumentNullException(nameof(llmInstance));
+            if (llamaLibInstance == null)
+                throw new ArgumentNullException(nameof(llamaLibInstance));
+            if (llmInstance == IntPtr.Zero)
+                throw new ArgumentNullException(nameof(llmInstance));
             llamaLib = llamaLibInstance;
             llm = llmInstance;
         }
@@ -46,8 +65,12 @@ namespace UndreamAI.LlamaLib
             IntPtr llmInstance = IntPtr.Zero;
             try
             {
-                llamaLibInstance = new LlamaLib(LlamaLib.Has_GPU_Layers(paramsString ?? string.Empty));
-                llmInstance = llamaLibInstance.LLMService_From_Command(paramsString ?? string.Empty);
+                llamaLibInstance = new LlamaLib(
+                    LlamaLib.Has_GPU_Layers(paramsString ?? string.Empty)
+                );
+                llmInstance = llamaLibInstance.LLMService_From_Command(
+                    paramsString ?? string.Empty
+                );
             }
             catch
             {
@@ -57,9 +80,18 @@ namespace UndreamAI.LlamaLib
             return new LLMService(llamaLibInstance, llmInstance);
         }
 
-        public static IntPtr CreateLLM(LlamaLib llamaLib, string modelPath, int numSlots, int numThreads,
-            int numGpuLayers, bool flashAttention, int contextSize, int batchSize,
-            bool embeddingOnly, string[] loraPaths)
+        public static IntPtr CreateLLM(
+            LlamaLib llamaLib,
+            string modelPath,
+            int numSlots,
+            int numThreads,
+            int numGpuLayers,
+            bool flashAttention,
+            int contextSize,
+            int batchSize,
+            bool embeddingOnly,
+            string[] loraPaths
+        )
         {
             IntPtr loraPathsPtr = IntPtr.Zero;
             int loraPathCount = 0;
@@ -77,7 +109,9 @@ namespace UndreamAI.LlamaLib
                         if (string.IsNullOrEmpty(loraPaths[i]))
                             throw new ArgumentException($"Lora path at index {i} is null or empty");
 
-                        IntPtr stringPtr = Marshal.StringToHGlobalAnsi(loraPaths[i] ?? string.Empty);
+                        IntPtr stringPtr = Marshal.StringToHGlobalAnsi(
+                            loraPaths[i] ?? string.Empty
+                        );
                         Marshal.WriteIntPtr(loraPathsPtr, i * IntPtr.Size, stringPtr);
                     }
                 }
@@ -98,9 +132,17 @@ namespace UndreamAI.LlamaLib
             try
             {
                 var llm = llamaLib.LLMService_Construct(
-                    modelPath ?? string.Empty, numSlots, numThreads, numGpuLayers,
-                    flashAttention, contextSize, batchSize, embeddingOnly,
-                    loraPathCount, loraPathsPtr);
+                    modelPath ?? string.Empty,
+                    numSlots,
+                    numThreads,
+                    numGpuLayers,
+                    flashAttention,
+                    contextSize,
+                    batchSize,
+                    embeddingOnly,
+                    loraPathCount,
+                    loraPathsPtr
+                );
 
                 if (llm == IntPtr.Zero)
                     throw new InvalidOperationException("Failed to create LLMService");
@@ -128,12 +170,9 @@ namespace UndreamAI.LlamaLib
             get
             {
                 CheckLlamaLib();
-                return Marshal.PtrToStringAnsi(llamaLib.LLMService_Command(llm)) ?? "";
+                return llamaLib.PtrToStringAndFree(llamaLib.LLMService_Command(llm));
             }
-
-            set
-            {
-            }
+            set { }
         }
     }
 }

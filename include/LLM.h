@@ -13,7 +13,6 @@
 #include <TargetConditionals.h>
 #endif
 
-
 /// @brief Structure representing a LoRA adapter with ID and scale
 /// @details Used for configuring Low-Rank Adaptation layers in language models
 struct LoraIdScale
@@ -24,10 +23,7 @@ struct LoraIdScale
     /// @brief Equality comparison operator
     /// @param other The other LoraIdScale to compare with
     /// @return true if both id and scale are equal, false otherwise
-    bool operator==(const LoraIdScale &other) const
-    {
-        return id == other.id && scale == other.scale;
-    }
+    bool operator==(const LoraIdScale &other) const { return id == other.id && scale == other.scale; }
 };
 
 /// @brief Structure representing a LoRA adapter with ID, scale, and file path
@@ -58,7 +54,7 @@ void ensure_error_handlers_initialized();
 /// LLM implementations must inherit from.
 class UNDREAMAI_API LLM
 {
-public:
+  public:
     int32_t n_keep = 0;       ///< Number of tokens to keep from the beginning of the context
     std::string grammar = ""; ///< Grammar specification in GBNF format or JSON schema
     json completion_params;   ///< JSON object containing completion parameters
@@ -101,7 +97,9 @@ public:
     /// @brief Set completion parameters
     /// @param completion_params_ JSON object containing completion parameters
     /// @details Parameters may include temperature, n_predict, etc.,
-    //  See https://github.com/ggml-org/llama.cpp/tree/master/tools/server#post-completion-given-a-prompt-it-returns-the-predicted-completion for the different parameters
+    //  See
+    //  https://github.com/ggml-org/llama.cpp/tree/master/tools/server#post-completion-given-a-prompt-it-returns-the-predicted-completion
+    //  for the different parameters
     virtual void set_completion_params(json completion_params_) { completion_params = completion_params_; }
 
     /// @brief Get current completion parameters
@@ -114,7 +112,8 @@ public:
     /// @param id_slot Slot ID for the request (-1 for auto)
     /// @param return_response_json Whether to return full JSON response
     /// @return Generated completion text or JSON response
-    virtual std::string completion(const std::string &prompt, CharArrayFn callback = nullptr, int id_slot = -1, bool return_response_json = false);
+    virtual std::string completion(const std::string &prompt, CharArrayFn callback = nullptr, int id_slot = -1,
+                                   bool return_response_json = false);
 
     /// @brief Generate text completion
     /// @param data JSON object containing prompt and parameters
@@ -160,9 +159,12 @@ public:
     /// @param embedding_only Whether to run in embedding-only mode
     /// @param lora_paths Vector of paths to LoRA adapter files
     /// @return Command line string with all parameters
-    static std::string LLM_args_to_command(const std::string &model_path, int num_slots = 1, int num_threads = -1, int num_GPU_layers = 0, bool flash_attention = false, int context_size = 4096, int batch_size = 2048, bool embedding_only = false, const std::vector<std::string> &lora_paths = {});
+    static std::string LLM_args_to_command(const std::string &model_path, int num_slots = 1, int num_threads = -1,
+                                           int num_GPU_layers = 0, bool flash_attention = false,
+                                           int context_size = 4096, int batch_size = 2048, bool embedding_only = false,
+                                           const std::vector<std::string> &lora_paths = {});
 
-protected:
+  protected:
     /// @brief Build JSON for template application
     /// @param messages JSON array of chat messages
     /// @return JSON object ready for apply_template_json
@@ -220,7 +222,7 @@ protected:
 /// slot management for concurrent requests and state persistence
 class UNDREAMAI_API LLMLocal : public LLM
 {
-public:
+  public:
     /// @brief Get an available processing slot
     /// @return Available slot ID, or -1 if none determined
     virtual int get_next_available_slot() = 0;
@@ -239,7 +241,10 @@ public:
     /// @param id_slot Slot ID to restore
     /// @param filepath Path to state file
     /// @return Operation result string
-    virtual std::string load_slot(int id_slot, const std::string &filepath) { return slot(id_slot, "restore", filepath); }
+    virtual std::string load_slot(int id_slot, const std::string &filepath)
+    {
+        return slot(id_slot, "restore", filepath);
+    }
 
     /// @brief Cancel request
     /// @param id_slot Slot ID to cancel
@@ -251,7 +256,7 @@ public:
     /// @details Protected method used internally for server-based slot management
     virtual std::string slot_json(const json &data) = 0;
 
-protected:
+  protected:
     /// @brief Perform slot operation
     /// @param id_slot Slot ID to operate on
     /// @param action Action to perform ("save" or "restore")
@@ -277,7 +282,7 @@ protected:
 /// and advanced features like LoRA management
 class UNDREAMAI_API LLMProvider : public LLMLocal
 {
-public:
+  public:
     /// @brief Virtual destructor
     virtual ~LLMProvider();
 
@@ -305,7 +310,8 @@ public:
     virtual void enable_reasoning(bool reasoning) { reasoning_enabled = reasoning; }
 
     /// @brief Set debug level
-    /// @param debug_level Debug verbosity level (0 = off, 1 = LlamaLib messages, 2 and higher = llama.cpp messages and more verbose)
+    /// @param debug_level Debug verbosity level (0 = off, 1 = LlamaLib messages, 2 and higher = llama.cpp messages and
+    /// more verbose)
     virtual void debug(int debug_level) = 0;
 
     /// @brief Set logging callback function
@@ -353,7 +359,7 @@ public:
     /// @return "standalore" or "runtime_detection" according to the implementation
     virtual std::string debug_implementation() = 0;
 
-protected:
+  protected:
     bool reasoning_enabled = false; ///< Whether reasoning is enabled
 
     /// @brief Parse LoRA weight configuration result
@@ -382,7 +388,7 @@ protected:
 /// LLM provider instances, debugging, and logging configuration
 class LLMProviderRegistry
 {
-public:
+  public:
     static bool initialised; ///< Whether the registry has been initialized
 
     /// @brief Inject a custom registry instance
@@ -435,33 +441,21 @@ public:
 
     /// @brief Set global debug level
     /// @param level Debug verbosity level
-    void set_debug_level(int level)
-    {
-        debug_level_ = level;
-    }
+    void set_debug_level(int level) { debug_level_ = level; }
 
     /// @brief Get current debug level
     /// @return Current debug level
-    const int get_debug_level()
-    {
-        return debug_level_;
-    }
+    const int get_debug_level() { return debug_level_; }
 
     /// @brief Set global log callback
     /// @param callback Function to receive log messages
-    void set_log_callback(CharArrayFn callback)
-    {
-        log_callback_ = callback;
-    }
+    void set_log_callback(CharArrayFn callback) { log_callback_ = callback; }
 
     /// @brief Get current log callback
     /// @return Current log callback function
-    const CharArrayFn get_log_callback()
-    {
-        return log_callback_;
-    }
+    const CharArrayFn get_log_callback() { return log_callback_; }
 
-private:
+  private:
     static LLMProviderRegistry *custom_instance_; ///< Custom injected instance
 
     std::mutex mutex_;                     ///< Thread synchronization mutex
@@ -557,7 +551,8 @@ extern "C"
     /// @param id_slot Slot ID (-1 for auto)
     /// @param return_response_json Whether to return JSON response
     /// @return Generated text or JSON response
-    UNDREAMAI_API const char *LLM_Completion(LLM *llm, const char *prompt, CharArrayFn callback = nullptr, int id_slot = -1, bool return_response_json = false);
+    UNDREAMAI_API const char *LLM_Completion(LLM *llm, const char *prompt, CharArrayFn callback = nullptr,
+                                             int id_slot = -1, bool return_response_json = false);
 
     /// @brief Save slot state (C API)
     /// @param llm LLMLocal instance pointer
@@ -616,7 +611,8 @@ extern "C"
     /// @param host Host address (default: "0.0.0.0")
     /// @param port Port number (0 for auto)
     /// @param API_key Optional API key
-    UNDREAMAI_API void LLM_Start_Server(LLMProvider *llm, const char *host = "0.0.0.0", int port = -1, const char *API_key = "");
+    UNDREAMAI_API void LLM_Start_Server(LLMProvider *llm, const char *host = "0.0.0.0", int port = -1,
+                                        const char *API_key = "");
 
     /// @brief Stop HTTP server (C API)
     /// @param llm LLMProvider instance pointer

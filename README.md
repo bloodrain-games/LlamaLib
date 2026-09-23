@@ -34,13 +34,13 @@ It is built on top of the awesome [llama.cpp](https://github.com/ggerganov/llama
 - 🌍 **Runs Anywhere**  
   Cross-platform and cross-device.  
   Works on all major platforms:
-    - Desktop: `Windows`, `macOS`, `Linux`
-    - Mobile: `Android`, `iOS`
-    - VR/AR: `Meta Quest`, `Apple Vision`, `Magic Leap`
+  - Desktop: `Windows`, `macOS`, `Linux`
+  - Mobile: `Android`, `iOS`
+  - VR/AR: `Meta Quest`, `Apple Vision`, `Magic Leap`
 
   and hardware architectures:
-    - CPU: Intel, AMD, Apple Silicon
-    - GPU: NVIDIA, AMD, Metal
+  - CPU: Intel, AMD, Apple Silicon
+  - GPU: NVIDIA, AMD, Metal
 
 - 🔍 **Architecture Detection at runtime**  
   Automatically selects the optimal backend at runtime supporting all major GPU and CPU architectures.
@@ -57,16 +57,19 @@ It is built on top of the awesome [llama.cpp](https://github.com/ggerganov/llama
 ## Why LlamaLib?
 
 ### Developer API
+
 - **Direct implementation** of LLM operations (completion, tokenization, embeddings)
 - **Clean architecture** for services, clients, and agents
 - **Simple server-client** setup with built-in SSL and authentication support
 
 ### Universal Deployment
+
 - **The only library** that lets you build for any hardware with runtime detection unlike alternatives limited to specific GPU vendors or CPU-only execution
 - **GPU backend auto-selection:** Automatically chooses NVIDIA, AMD, Metal or switch to CPU
 - **CPU optimization:** Identifies and uses optimal CPU instruction sets
 
 ### Production Ready
+
 - **Embedded deployment:** No need for open ports or external processes
 - **Small footprint:** Compact builds ideal for PC or mobile deployment
 - **Battle-tested:** Powers [LLM for Unity](https://github.com/undreamai/LLMUnity), the most widely used LLM integration for games
@@ -74,6 +77,7 @@ It is built on top of the awesome [llama.cpp](https://github.com/ggerganov/llama
 ---
 
 ## How to help
+
 - ⭐ [Star the repo](https://github.com/undreamai/LlamaLib) and spread the word!
 - ❤️ [Sponsor](https://github.com/sponsors/amakropoulos) development or support with a [![Ko-fi](https://img.shields.io/badge/Ko--fi-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/amakropoulos)
 - 💬 Join our [Discord](https://discord.gg/RwXKQb6zdv) community
@@ -82,6 +86,7 @@ It is built on top of the awesome [llama.cpp](https://github.com/ggerganov/llama
 ---
 
 ## Projects using LlamaLib
+
 - [LLM for Unity](https://github.com/undreamai/LLMUnity): The most widely used solution to integrate LLMs in games
 
 ---
@@ -91,6 +96,7 @@ It is built on top of the awesome [llama.cpp](https://github.com/ggerganov/llama
 ### Documentation
 
 **Language Guides:**
+
 - **C++**: [API guide](cpp_api.md) • [Examples](examples/cpp)
 - **C#**: [API guide](csharp_api.md) • [Examples](examples/csharp)
 
@@ -98,11 +104,11 @@ It is built on top of the awesome [llama.cpp](https://github.com/ggerganov/llama
 
 LlamaLib provides three main classes for different use cases:
 
-| Class | Purpose | Best For |
-|-------|---------|----------|
-| **LLMService** | LLM backend engine | Building standalone apps or servers |
-| **LLMClient** | Local or remote LLM access | Connecting to existing LLM services |
-| **LLMAgent** | Conversational AI with memory | Building chatbots or interactive AI |
+| Class          | Purpose                       | Best For                            |
+| -------------- | ----------------------------- | ----------------------------------- |
+| **LLMService** | LLM backend engine            | Building standalone apps or servers |
+| **LLMClient**  | Local or remote LLM access    | Connecting to existing LLM services |
+| **LLMAgent**   | Conversational AI with memory | Building chatbots or interactive AI |
 
 ### C++ Example
 
@@ -117,17 +123,17 @@ int main() {
        gpu_layers=0,   // GPU layers (0 = CPU only)
        num_slots=1     // parallel slots/clients
     */
-    
+
     // Start service
     llm.start();
-    
+
     // Generate completion
     std::string response = llm.completion("Hello, how are you?");
     std::cout << response << std::endl;
-    
+
     // Supports streaming operation to your function:
     // llm.completion(prompt, streaming_callback);
-    
+
     return 0;
 }
 ```
@@ -148,12 +154,12 @@ class Program {
            gpu_layers=0,   // GPU layers (0 = CPU only)
            num_slots=1     // parallel slots/clients
         */
-        
+
         llm.Start();
-        
+
         string response = llm.Completion("Hello, how are you?");
         Console.WriteLine(response);
-        
+
         // Supports streaming operation to your function:
         // llm.Completion(prompt, streamingCallback);
     }

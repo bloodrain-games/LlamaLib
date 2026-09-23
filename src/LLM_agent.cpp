@@ -46,7 +46,8 @@ json LLMAgent::build_working_history(const std::string &user_prompt, bool includ
     json working_history = build_system_history();
     if (include_history)
     {
-        for (const auto &m : history) working_history.push_back(m);
+        for (const auto &m : history)
+            working_history.push_back(m);
     }
     working_history.push_back(ChatMessage(USER_ROLE, user_prompt).to_json());
     return working_history;
@@ -57,12 +58,17 @@ void LLMAgent::set_n_keep()
     try
     {
         n_keep = tokenize(apply_template(build_working_history("", false))).size();
-    } catch(...){ }
+    }
+    catch (...)
+    {
+    }
 }
 
-std::string LLMAgent::chat(const std::string &user_prompt, bool add_to_history, CharArrayFn callback, bool return_response_json, bool debug_prompt)
+std::string LLMAgent::chat(const std::string &user_prompt, bool add_to_history, CharArrayFn callback,
+                           bool return_response_json, bool debug_prompt)
 {
-    if (n_keep == -1) set_n_keep();
+    if (n_keep == -1)
+        set_n_keep();
 
     // Handle context overflow before sending
     if (overflow_strategy != ContextOverflowStrategy::None)
@@ -74,7 +80,8 @@ std::string LLMAgent::chat(const std::string &user_prompt, bool add_to_history, 
     {
         LLMProviderRegistry &registry = LLMProviderRegistry::instance();
         auto log_callback = registry.get_log_callback();
-        if (log_callback != nullptr) log_callback(query_prompt.c_str());
+        if (log_callback != nullptr)
+            log_callback(query_prompt.c_str());
     }
 
     // Call completion with the formatted prompt
@@ -172,36 +179,38 @@ void LLMAgent::load_history(const std::string &filepath)
 bool LLMAgent::handle_overflow(const std::string &user_prompt)
 {
     int ctx = get_slot_context_size();
-    if (ctx <= 0) return false;
+    if (ctx <= 0)
+        return false;
 
     int prompt_tokens = static_cast<int>(tokenize(apply_template(build_working_history(user_prompt))).size());
-    if (prompt_tokens < ctx) return false;
+    if (prompt_tokens < ctx)
+        return false;
 
     switch (overflow_strategy)
     {
-        case ContextOverflowStrategy::Truncate:
-            truncate_history(user_prompt);
-            return true;
-        case ContextOverflowStrategy::Summarize:
-            summarize_history(user_prompt);
-            return true;
-        default:
-            return false;
+    case ContextOverflowStrategy::Truncate:
+        truncate_history(user_prompt);
+        return true;
+    case ContextOverflowStrategy::Summarize:
+        summarize_history(user_prompt);
+        return true;
+    default:
+        return false;
     }
 }
 
 void LLMAgent::truncate_history(const std::string &user_prompt)
 {
     int ctx = get_slot_context_size();
-    if (ctx <= 0 || history.empty()) return;
+    if (ctx <= 0 || history.empty())
+        return;
 
-    std::cout<<"context size reached, truncating history"<<std::endl;
+    std::cout << "context size reached, truncating history" << std::endl;
 
     int target_tokens = static_cast<int>(ctx * target_context_ratio);
 
-    auto measure = [&]() -> int {
-        return static_cast<int>(tokenize(apply_template(build_working_history(user_prompt))).size());
-    };
+    auto measure = [&]() -> int
+    { return static_cast<int>(tokenize(apply_template(build_working_history(user_prompt))).size()); };
 
     while (history.size() >= 2 && measure() > target_tokens)
         history.erase(history.begin(), history.begin() + 2);
@@ -213,13 +222,16 @@ void LLMAgent::truncate_history(const std::string &user_prompt)
 
 void LLMAgent::summarize_history(const std::string &user_prompt)
 {
-    if (history.empty()) return;
+    if (history.empty())
+        return;
     int ctx = get_slot_context_size();
-    if (ctx <= 0) return;
+    if (ctx <= 0)
+        return;
 
-    std::cout<<"context size reached, summarizing history"<<std::endl;
+    std::cout << "context size reached, summarizing history" << std::endl;
     // Build the prompt for a summary request, incorporating any prior rolling summary.
-    auto build_summary_prompt = [&](const std::string &transcript) -> std::string {
+    auto build_summary_prompt = [&](const std::string &transcript) -> std::string
+    {
         std::string query = summarize_prompt;
         if (!summary.empty())
             query += "Existing summary:\n" + summary + "\n\n";
@@ -230,9 +242,7 @@ void LLMAgent::summarize_history(const std::string &user_prompt)
     };
 
     int n_keep_prev = n_keep;
-    json summary_prompt_msg = json::array({
-        ChatMessage(USER_ROLE, summarize_prompt).to_json()
-    });
+    json summary_prompt_msg = json::array({ChatMessage(USER_ROLE, summarize_prompt).to_json()});
     n_keep = tokenize(apply_template(summary_prompt_msg)).size();
 
     try
@@ -240,20 +250,22 @@ void LLMAgent::summarize_history(const std::string &user_prompt)
         // Walk history, flushing a summary call whenever the accumulating transcript
         // would itself overflow the context.
         std::string transcript;
-        for (int i=0; i<history.size(); i+=2)
+        for (int i = 0; i < history.size(); i += 2)
         {
             std::string line = "";
-            for (int j=0; j<2; j++)
+            for (int j = 0; j < 2; j++)
             {
-                if (i+j >= history.size()-1) break;
-                json msg = history[i+j];
-                std::string role    = msg.at("role").get<std::string>();
+                if (i + j >= history.size() - 1)
+                    break;
+                json msg = history[i + j];
+                std::string role = msg.at("role").get<std::string>();
                 std::string content = msg.at("content").get<std::string>();
                 line += role + ": " + content + "\n";
             }
 
             // Flush before appending if this line would push the prompt over the limit
-            if (!transcript.empty() && static_cast<int>(tokenize(build_summary_prompt(transcript + line)).size()) >= ctx*0.75)
+            if (!transcript.empty() &&
+                static_cast<int>(tokenize(build_summary_prompt(transcript + line)).size()) >= ctx * 0.75)
             {
                 summary = completion(build_summary_prompt(transcript));
                 transcript = "";
@@ -294,7 +306,8 @@ LLMAgent *LLMAgent_Construct(LLMLocal *llm, const char *system_prompt_)
     return new LLMAgent(llm, system_prompt);
 }
 
-const char *LLMAgent_Chat(LLMAgent *llm, const char *user_prompt, bool add_to_history, CharArrayFn callback, bool return_response_json, bool debug_prompt)
+const char *LLMAgent_Chat(LLMAgent *llm, const char *user_prompt, bool add_to_history, CharArrayFn callback,
+                          bool return_response_json, bool debug_prompt)
 {
     return stringToCharArray(llm->chat(user_prompt, add_to_history, callback, return_response_json, debug_prompt));
 }
@@ -411,4 +424,12 @@ const char *LLMAgent_Get_Summary(LLMAgent *llm)
 void LLMAgent_Set_Summary(LLMAgent *llm, const char *summary)
 {
     llm->set_summary(summary ? summary : "");
+}
+
+void LLMAgent_Delete(LLMAgent *llm)
+{
+    if (llm != nullptr)
+    {
+        delete llm;
+    }
 }

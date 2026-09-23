@@ -2,11 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Threading;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using System.Threading;
 using UndreamAI.LlamaLib;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace UndreamAI.LlamaLib.Tests
 {
@@ -14,11 +14,13 @@ namespace UndreamAI.LlamaLib.Tests
     public class LlamaLibTests
     {
         private const string SYSTEM_PROMPT = "you are an artificial intelligence assistant";
-        private const string PROMPT = $"<|im_start|>system\n{SYSTEM_PROMPT}<|im_end|>\n<|im_start|>user\nhow are you?<|im_end|>\n<|im_start|>assistant\n";
+        private const string PROMPT =
+            $"<|im_start|>system\n{SYSTEM_PROMPT}<|im_end|>\n<|im_start|>user\nhow are you?<|im_end|>\n<|im_start|>assistant\n";
         private const int ID_SLOT = 0;
         private static readonly object completionLock = new object();
         private static int counter = 0;
         private static string concatData = "";
+
         // place model.gguf inside the tests folder
         private static string testModelPath => FindModel("model.gguf");
         private static string testModelEmbeddingPath => FindModel("model_embedding.gguf");
@@ -192,7 +194,7 @@ namespace UndreamAI.LlamaLib.Tests
                 new ChatMessage("user", "Hello"),
                 new ChatMessage("assistant", "Hi there!"),
                 new ChatMessage("user", "How are you?"),
-                new ChatMessage("assistant", "I'm doing well, thanks!")
+                new ChatMessage("assistant", "I'm doing well, thanks!"),
             };
 
             // Test SetHistory
@@ -313,7 +315,6 @@ namespace UndreamAI.LlamaLib.Tests
             TestHistoryFileOperations(llm);
             TestChatFunctionality(llm);
         }
-
 
         [TestMethod]
         public void Tests_LLMService()

@@ -1,17 +1,18 @@
 
 #pragma once
+#include "defs.h"
+#include <functional>
+#include <iostream>
 #include <string>
 #include <vector>
-#include <functional>
-#include "defs.h"
-#include <iostream>
 
 /**
  * @brief Handles concatenation of LLM response chunks (both streaming and non-streaming)
  * Accumulates content and tokens from multiple response chunks into a single result
  */
-class ResponseConcatenator {
-public:
+class ResponseConcatenator
+{
+  public:
     ResponseConcatenator() = default;
 
     /**
@@ -19,7 +20,7 @@ public:
      * @param chunk_data The JSON chunk data (can be SSE format "data: {...}" or plain JSON)
      * @return true if processing should continue, false if done or error
      */
-    bool process_chunk(const std::string& chunk_data);
+    bool process_chunk(const std::string &chunk_data);
 
     /**
      * @brief Build the final concatenated JSON result
@@ -29,12 +30,12 @@ public:
     /**
      * @brief Get the concatenated content string
      */
-    const std::string& get_content() const { return concatenated_content_; }
+    const std::string &get_content() const { return concatenated_content_; }
 
     /**
      * @brief Get the concatenated tokens
      */
-    const std::vector<int>& get_tokens() const { return concatenated_tokens_; }
+    const std::vector<int> &get_tokens() const { return concatenated_tokens_; }
 
     /**
      * @brief Get the complete result as JSON string
@@ -49,7 +50,7 @@ public:
     /**
      * @brief Get the error JSON if any
      */
-    const json& get_error() const { return error_; }
+    const json &get_error() const { return error_; }
 
     /**
      * @brief Check if response is complete
@@ -64,7 +65,8 @@ public:
     /**
      * @brief Set a callback to be invoked after each chunk is processed
      */
-    void set_callback(CharArrayFn callback, bool callWithJSON=false) {
+    void set_callback(CharArrayFn callback, bool callWithJSON = false)
+    {
         callback_ = std::move(callback);
         callWithJSON_ = callWithJSON;
     }
@@ -74,8 +76,8 @@ public:
      */
     void reset();
 
-private:
-    void accumulate_result(const json& item);
+  private:
+    void accumulate_result(const json &item);
 
     std::string concatenated_content_;
     std::vector<int> concatenated_tokens_;

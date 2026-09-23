@@ -4,12 +4,15 @@ namespace UndreamAI.LlamaLib
 {
     public class LLMClient : LLMLocal
     {
+        private bool ownsLlamaLib = false;
+
         public LLMClient(LLMProvider provider)
         {
             if (provider.disposed)
                 throw new ObjectDisposedException(nameof(provider));
 
             llamaLib = provider.llamaLib;
+            ownsLlamaLib = false;
             llm = CreateClient(provider);
         }
 
@@ -21,6 +24,7 @@ namespace UndreamAI.LlamaLib
             try
             {
                 llamaLib = new LlamaLib(false);
+                ownsLlamaLib = true;
                 llm = CreateRemoteClient(url, port, apiKey, numRetries);
             }
             catch
@@ -38,11 +42,23 @@ namespace UndreamAI.LlamaLib
             return llm;
         }
 
-        private IntPtr CreateRemoteClient(string url, int port, string apiKey = "", int numRetries = 5)
+        private IntPtr CreateRemoteClient(
+            string url,
+            int port,
+            string apiKey = "",
+            int numRetries = 5
+        )
         {
-            var llm = llamaLib.LLMClient_Construct_Remote(url ?? string.Empty, port, apiKey ?? string.Empty, numRetries);
+            var llm = llamaLib.LLMClient_Construct_Remote(
+                url ?? string.Empty,
+                port,
+                apiKey ?? string.Empty,
+                numRetries
+            );
             if (llm == IntPtr.Zero)
-                throw new InvalidOperationException($"Failed to create remote LLMClient for {url}:{port}");
+                throw new InvalidOperationException(
+                    $"Failed to create remote LLMClient for {url}:{port}"
+                );
             return llm;
         }
 
@@ -54,6 +70,32 @@ namespace UndreamAI.LlamaLib
         public bool IsServerAlive()
         {
             return llamaLib.LLMClient_Is_Server_Alive(llm);
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            lock (_disposeLock)
+            {
+                if (!disposed)
+                {
+                    if (llm != IntPtr.Zero && llamaLib != null)
+                    {
+                        try
+                        {
+                            llamaLib.LLMClient_Delete(llm);
+                        }
+                        catch (Exception) { }
+                        llm = IntPtr.Zero;
+                    }
+                    if (disposing && ownsLlamaLib)
+                    {
+                        llamaLib?.Dispose();
+                        llamaLib = null;
+                    }
+                    disposed = true;
+                }
+            }
+            base.Dispose(disposing);
         }
     }
 }
