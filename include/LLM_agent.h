@@ -85,13 +85,6 @@ class UNDREAMAI_API LLMAgent : public LLMLocal
     /// @details Creates an agent that manages conversations with the specified LLM backend
     explicit LLMAgent(LLMLocal *llm, const std::string &system_prompt = "");
 
-    using LLMLocal::build_completion_json;
-    using LLMLocal::build_slot_json;
-    using LLMLocal::cancel;
-    using LLMLocal::completion;
-    using LLMLocal::load_slot;
-    using LLMLocal::save_slot;
-
     //=================================== LLM METHOD DELEGATES ===================================//
     /// @brief Tokenize input (override)
     /// @param data JSON object containing text to tokenize
